@@ -67,7 +67,7 @@ export function AppSidebar() {
             </div>
             {!collapsed && (
               <div>
-                <h1 className="text-lg font-bold text-fleet-sidebar-foreground">FleetManager</h1>
+                <h1 className="text-lg font-bold text-fleet-sidebar-foreground">FrotaPro</h1>
                 <p className="text-xs text-fleet-sidebar-foreground/60">Gestão de Frotas</p>
               </div>
             )}
