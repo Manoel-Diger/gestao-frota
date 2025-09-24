@@ -12,63 +12,30 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-const vehicles = [
-  {
-    id: 1,
-    plate: "ABC-1234",
-    model: "Mercedes-Benz Actros",
-    type: "Caminhão",
-    year: 2022,
-    status: "Ativo",
-    driver: "João Silva",
-    lastMaintenance: "2024-01-15",
-    nextMaintenance: "2024-04-15",
-    fuel: 85,
-    location: "São Paulo - SP",
-  },
-  {
-    id: 2,
-    plate: "DEF-5678",
-    model: "Volkswagen Delivery",
-    type: "Van",
-    year: 2021,
-    status: "Manutenção",
-    driver: "Maria Santos",
-    lastMaintenance: "2024-02-10",
-    nextMaintenance: "2024-05-10",
-    fuel: 15,
-    location: "Rio de Janeiro - RJ",
-  },
-  {
-    id: 3,
-    plate: "GHI-9012",
-    model: "Ford Transit",
-    type: "Furgão",
-    year: 2023,
-    status: "Ativo",
-    driver: "Carlos Oliveira",
-    lastMaintenance: "2024-01-20",
-    nextMaintenance: "2024-04-20",
-    fuel: 67,
-    location: "Belo Horizonte - MG",
-  },
-];
+import { useVeiculos } from "@/hooks/useVeiculos";
+import { VehicleForm } from "@/components/vehicles/VehicleForm";
 
 const statusColors = {
-  Ativo: "bg-success text-success-foreground",
-  Manutenção: "bg-warning text-warning-foreground",
-  Inativo: "bg-muted text-muted-foreground",
+  "Ativo": "bg-success text-success-foreground",
+  "Manutenção": "bg-warning text-warning-foreground",
+  "Inativo": "bg-muted text-muted-foreground",
+  "Em uso": "bg-primary text-primary-foreground",
+  "Disponível": "bg-success text-success-foreground",
 };
 
 export default function Vehicles() {
   const [searchTerm, setSearchTerm] = useState("");
+  const { veiculos, loading, error, refreshVeiculos } = useVeiculos();
 
-  const filteredVehicles = vehicles.filter(vehicle =>
-    vehicle.plate.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    vehicle.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    vehicle.driver.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredVehicles = veiculos.filter(veiculo =>
+    (veiculo.placa?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+    (veiculo.modelo?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+    (veiculo.marca?.toLowerCase().includes(searchTerm.toLowerCase()) || false)
   );
+
+  const totalVeiculos = veiculos.length;
+  const veiculosAtivos = veiculos.filter(v => v.status === "Ativo" || v.status === "Em uso").length;
+  const veiculosManutencao = veiculos.filter(v => v.status === "Manutenção").length;
 
   return (
     <div className="space-y-6">
@@ -78,10 +45,7 @@ export default function Vehicles() {
           <h1 className="text-3xl font-bold text-foreground">Veículos</h1>
           <p className="text-muted-foreground">Gerencie todos os veículos da frota</p>
         </div>
-        <Button className="bg-gradient-primary hover:bg-primary-hover">
-          <Plus className="mr-2 h-4 w-4" />
-          Adicionar Veículo
-        </Button>
+        <VehicleForm onSuccess={refreshVeiculos} />
       </div>
 
       {/* Stats Cards */}
@@ -91,18 +55,19 @@ export default function Vehicles() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total</p>
-                <p className="text-2xl font-bold">24</p>
+                <p className="text-2xl font-bold">{totalVeiculos}</p>
               </div>
               <Car className="h-8 w-8 text-primary" />
             </div>
           </CardContent>
         </Card>
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Ativos</p>
-                <p className="text-2xl font-bold text-success">21</p>
+                <p className="text-2xl font-bold text-success">{veiculosAtivos}</p>
               </div>
               <div className="h-8 w-8 rounded-full bg-success/20 flex items-center justify-center">
                 <Car className="h-4 w-4 text-success" />
@@ -110,12 +75,13 @@ export default function Vehicles() {
             </div>
           </CardContent>
         </Card>
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Em Manutenção</p>
-                <p className="text-2xl font-bold text-warning">3</p>
+                <p className="text-2xl font-bold text-warning">{veiculosManutencao}</p>
               </div>
               <div className="h-8 w-8 rounded-full bg-warning/20 flex items-center justify-center">
                 <Car className="h-4 w-4 text-warning" />
@@ -123,6 +89,7 @@ export default function Vehicles() {
             </div>
           </CardContent>
         </Card>
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -155,71 +122,102 @@ export default function Vehicles() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Veículo</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Motorista</TableHead>
-                  <TableHead>Combustível</TableHead>
-                  <TableHead>Próxima Manutenção</TableHead>
-                  <TableHead>Localização</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredVehicles.map((vehicle) => (
-                  <TableRow key={vehicle.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{vehicle.plate}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {vehicle.model} - {vehicle.year}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={statusColors[vehicle.status as keyof typeof statusColors]}>
-                        {vehicle.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{vehicle.driver}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full ${vehicle.fuel > 50 ? 'bg-success' : vehicle.fuel > 25 ? 'bg-warning' : 'bg-destructive'}`}
-                            style={{ width: `${vehicle.fuel}%` }}
-                          />
-                        </div>
-                        <span className="text-sm">{vehicle.fuel}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-sm">
-                        <Calendar className="h-3 w-3" />
-                        {new Date(vehicle.nextMaintenance).toLocaleDateString('pt-BR')}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1 text-sm">
-                        <MapPin className="h-3 w-3" />
-                        {vehicle.location}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="outline" size="sm">
-                        Detalhes
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
+
+        {/*
+          Envolvemos o Card da tabela com um container que tem overflow-x-auto.
+          Dentro do Card definimos overflow-visible para evitar que o Card corte o scrollbar.
+          Em seguida colocamos um wrapper com min-w para forçar a tabela a ser maior que a viewport
+          e assim aparecer a rolagem horizontal no mobile.
+        */}
+        <div className="w-full overflow-x-auto">
+          <Card className="overflow-visible">
+            <CardContent className="p-4">
+              <div className="min-w-[760px]">
+                <Table className="min-w-full">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Veículo</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Motorista</TableHead>
+                      <TableHead>Combustível</TableHead>
+                      <TableHead>Próxima Manutenção</TableHead>
+                      <TableHead>Localização</TableHead>
+                      <TableHead>Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          Carregando veículos...
+                        </TableCell>
+                      </TableRow>
+                    ) : error ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-destructive">
+                          Erro: {error}
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredVehicles.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8">
+                          Nenhum veículo encontrado
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredVehicles.map((veiculo) => (
+                        <TableRow key={veiculo.id}>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{veiculo.placa || 'N/A'}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {veiculo.marca} {veiculo.modelo} - {veiculo.ano}
+                              </p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={statusColors[veiculo.status as keyof typeof statusColors] || "bg-muted text-muted-foreground"}>
+                              {veiculo.status || 'N/A'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>Não definido</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full ${(veiculo.combustivel_atual || 0) > 50 ? 'bg-success' : (veiculo.combustivel_atual || 0) > 25 ? 'bg-warning' : 'bg-destructive'}`}
+                                  style={{ width: `${veiculo.combustivel_atual || 0}%` }}
+                                />
+                              </div>
+                              <span className="text-sm">{veiculo.combustivel_atual || 0}%</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1 text-sm">
+                              <Calendar className="h-3 w-3" />
+                              {veiculo.proxima_manutencao ? new Date(veiculo.proxima_manutencao).toLocaleDateString('pt-BR') : 'N/A'}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1 text-sm">
+                              <MapPin className="h-3 w-3" />
+                              {veiculo.localizacao || 'N/A'}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Button variant="outline" size="sm">
+                              Detalhes
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </Card>
     </div>
   );

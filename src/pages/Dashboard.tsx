@@ -4,8 +4,24 @@ import { RecentActivity } from "@/components/dashboard/RecentActivity";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useVeiculos } from "@/hooks/useVeiculos";
+import { useMotoristas } from "@/hooks/useMotoristas";
+import { useManutencoes } from "@/hooks/useManutencoes";
+import { useAbastecimentos } from "@/hooks/useAbastecimentos";
 
 export default function Dashboard() {
+  const { veiculos } = useVeiculos();
+  const { motoristas } = useMotoristas();
+  const { manutencoes } = useManutencoes();
+  const { abastecimentos } = useAbastecimentos();
+
+  // Calcular métricas em tempo real
+  const totalVeiculos = veiculos.length;
+  const motoristasAtivos = motoristas.filter(m => m.status === "Ativo").length;
+  const manutencoesPendentes = manutencoes.filter(m => m.data && new Date(m.data) > new Date()).length;
+  const consumoMedio = abastecimentos.length > 0 ? 
+    (abastecimentos.reduce((sum, ab) => sum + (ab.litros || 0), 0) / abastecimentos.length).toFixed(1) : 
+    "0";
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -24,25 +40,25 @@ export default function Dashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatsCard
           title="Total de Veículos"
-          value="24"
+          value={totalVeiculos.toString()}
           icon={<Car className="h-4 w-4" />}
           trend={{ value: "2.1%", isPositive: true }}
         />
         <StatsCard
           title="Motoristas Ativos"
-          value="18"
+          value={motoristasAtivos.toString()}
           icon={<Users className="h-4 w-4" />}
           trend={{ value: "1.2%", isPositive: true }}
         />
         <StatsCard
           title="Manutenções Pendentes"
-          value="3"
+          value={manutencoesPendentes.toString()}
           icon={<Wrench className="h-4 w-4" />}
           trend={{ value: "0.5%", isPositive: false }}
         />
         <StatsCard
           title="Consumo Médio"
-          value="12.5L"
+          value={`${consumoMedio}L`}
           icon={<Fuel className="h-4 w-4" />}
           trend={{ value: "3.2%", isPositive: false }}
         />
