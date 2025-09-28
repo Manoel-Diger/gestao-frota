@@ -32,6 +32,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
 
+// Schema de validação
 const vehicleSchema = z.object({
   placa: z.string().min(7, "Placa deve ter pelo menos 7 caracteres").max(8, "Placa deve ter no máximo 8 caracteres"),
   marca: z.string().min(2, "Marca é obrigatória"),
@@ -43,6 +44,7 @@ const vehicleSchema = z.object({
   proxima_manutencao: z.string().min(1, "Data da próxima manutenção é obrigatória"),
   localizacao: z.string().min(2, "Localização é obrigatória"),
   combustivel_atual: z.number().min(0, "Nível de combustível deve ser entre 0 e 100").max(100, "Nível de combustível deve ser entre 0 e 100"),
+  motorista: z.string().optional(),
 });
 
 type VehicleFormData = z.infer<typeof vehicleSchema>;
@@ -69,6 +71,7 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
       proxima_manutencao: "",
       localizacao: "",
       combustivel_atual: 100,
+      motorista: "",
     },
   });
 
@@ -76,22 +79,17 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
     try {
       setLoading(true);
       
+      // Garante que a data seja enviada no formato ISO sem ajuste de fuso horário
+      const formattedData = {
+        ...data,
+        placa: data.placa.toUpperCase(),
+        proxima_manutencao: data.proxima_manutencao, // Mantém o formato AAAA-MM-DD como retornado pelo input type="date"
+        motorista: data.motorista || null,
+      };
+
       const { error } = await supabase
         .from('Veiculos')
-        .insert([
-          {
-            placa: data.placa.toUpperCase(),
-            marca: data.marca,
-            modelo: data.modelo,
-            ano: data.ano,
-            status: data.status,
-            quilometragem: data.quilometragem,
-            tipo_combustivel: data.tipo_combustivel,
-            proxima_manutencao: data.proxima_manutencao,
-            localizacao: data.localizacao,
-            combustivel_atual: data.combustivel_atual,
-          }
-        ]);
+        .insert([formattedData]);
 
       if (error) throw error;
 
@@ -122,7 +120,7 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
           Adicionar Veículo
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Cadastrar Novo Veículo</DialogTitle>
           <DialogDescription>
@@ -132,7 +130,24 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
+              <FormField
+                control={form.control}
+                name="motorista"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Motorista</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Nome do motorista" 
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="placa"

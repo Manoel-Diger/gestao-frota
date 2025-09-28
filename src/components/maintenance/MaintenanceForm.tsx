@@ -1,21 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -28,223 +19,235 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from '@/integrations/supabase/client';
 
-const maintenanceSchema = z.object({
-  veiculo_placa: z.string().min(1, "Veículo é obrigatório"),
-  tipo_manutencao: z.enum(["Preventiva", "Corretiva"]),
-  data: z.string().min(1, "Data é obrigatória"),
-  custo: z.number().min(0, "Custo deve ser positivo"),
-  descricao: z.string().min(5, "Descrição deve ter pelo menos 5 caracteres"),
+// ESQUEMA DE VALIDAÇÃO
+const formSchema = z.object({
+  veiculo_placa: z.string().min(3, "A placa é obrigatória."),
+  tipo_manutencao: z.enum(["Preventiva", "Corretiva", "Preditiva"]),
+  data: z.string().min(1, "A data de agendamento é obrigatória."),
+  
+  // VALIDAÇÃO ZOD: Permite 0, proíbe valores negativos.
+  custo: z.coerce.number() 
+    .min(0, "O custo não pode ser negativo.") // Permite zero!
+    .nullish()
+    .transform(val => val === null || val === undefined || isNaN(val as number) ? 0 : val), 
+
+  descricao: z.string().min(5, "A descrição é obrigatória."),
+  
+  // STATUS: Incluído no formulário para ser editável
+  status: z.enum(["Agendada", "Concluída", "Cancelada"]).default("Agendada"),
 });
 
-type MaintenanceFormData = z.infer<typeof maintenanceSchema>;
+type MaintenanceFormValues = z.infer<typeof formSchema>;
 
+// INTERFACE
 interface MaintenanceFormProps {
-  onSuccess?: () => void;
+    onSuccess: () => Promise<void>; 
 }
 
+// EXPORTAÇÃO: Mantendo o padrão NOMEADO (export function) para estabilidade
 export function MaintenanceForm({ onSuccess }: MaintenanceFormProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [vehicles, setVehicles] = useState<any[]>([]);
-  const { toast } = useToast();
 
-  const form = useForm<MaintenanceFormData>({
-    resolver: zodResolver(maintenanceSchema),
+  const form = useForm<MaintenanceFormValues>({
+    resolver: zodResolver(formSchema),
     defaultValues: {
       veiculo_placa: "",
       tipo_manutencao: "Preventiva",
-      data: "",
-      custo: 0,
+      // Correção: Usar data local correta para o Brasil (hoje: 27/09/2025, 23:31 BRT)
+      data: new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).split('/').reverse().join('-'),
+      custo: 0, 
       descricao: "",
+      status: "Agendada",
     },
   });
 
-  useEffect(() => {
-    const fetchVehicles = async () => {
-      const { data } = await supabase
-        .from('Veiculos')
-        .select('placa, marca, modelo')
-        .order('placa');
-      
-      if (data) setVehicles(data);
-    };
+  // Reinicia o formulário ao abrir o diálogo
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (isOpen) {
+      form.reset({
+        veiculo_placa: "",
+        tipo_manutencao: "Preventiva",
+        data: new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).split('/').reverse().join('-'),
+        custo: 0,
+        descricao: "",
+        status: "Agendada",
+      });
+    }
+  };
 
-    if (open) fetchVehicles();
-  }, [open]);
-
-  const onSubmit = async (data: MaintenanceFormData) => {
+  const onSubmit = async (values: MaintenanceFormValues) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      const { error } = await supabase
-        .from('Manutencoes')
-        .insert([
-          {
-            veiculo_placa: data.veiculo_placa,
-            tipo_manutencao: data.tipo_manutencao,
-            data: data.data,
-            custo: data.custo,
-            descricao: data.descricao,
-          }
-        ]);
+      // Inserir no Supabase
+      const { error } = await supabase.from('Manutencoes').insert({
+        veiculo_placa: values.veiculo_placa,
+        tipo_manutencao: values.tipo_manutencao,
+        data: values.data,
+        custo: values.custo,
+        descricao: values.descricao,
+        status: values.status,
+      });
 
       if (error) throw error;
 
-      toast({
-        title: "Sucesso!",
-        description: "Manutenção cadastrada com sucesso.",
-      });
+      console.log("Dados de Manutenção enviados:", values);
 
-      form.reset();
-      setOpen(false);
-      onSuccess?.();
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: error instanceof Error ? error.message : "Erro ao cadastrar manutenção",
-        variant: "destructive",
-      });
+      // Chama o callback de sucesso (refetch) apenas se o insert for bem-sucedido
+      await onSuccess(); 
+    } catch (err) {
+      console.error("Erro ao registrar manutenção:", err);
     } finally {
       setLoading(false);
+      setOpen(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button className="bg-gradient-primary hover:bg-primary-hover w-full sm:w-auto">
+        <Button className="bg-gradient-primary hover:bg-primary-hover">
           <Plus className="mr-2 h-4 w-4" />
           Nova Manutenção
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Cadastrar Nova Manutenção</DialogTitle>
-          <DialogDescription>
-            Registre uma nova manutenção para um veículo da frota.
-          </DialogDescription>
+          <DialogTitle>Registrar Nova Manutenção</DialogTitle>
         </DialogHeader>
-        
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="veiculo_placa"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Veículo</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o veículo" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {vehicles.map((vehicle) => (
-                          <SelectItem key={vehicle.placa} value={vehicle.placa}>
-                            {vehicle.placa} - {vehicle.marca} {vehicle.modelo}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* Placa do Veículo */}
+            <FormField
+              control={form.control}
+              name="veiculo_placa"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Placa do Veículo</FormLabel>
+                  <FormControl>
+                    <Input placeholder="ABC1234" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="tipo_manutencao"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tipo de Manutenção</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o tipo" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Preventiva">Preventiva</SelectItem>
-                        <SelectItem value="Corretiva">Corretiva</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="data"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Data</FormLabel>
+            {/* Tipo de Manutenção */}
+            <FormField
+              control={form.control}
+              name="tipo_manutencao"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o tipo" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    <SelectContent>
+                      <SelectItem value="Preventiva">Preventiva</SelectItem>
+                      <SelectItem value="Corretiva">Corretiva</SelectItem>
+                      <SelectItem value="Preditiva">Preditiva</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="custo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Custo (R$)</FormLabel>
+            {/* Data de Agendamento */}
+            <FormField
+              control={form.control}
+              name="data"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Data de Agendamento</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Custo (Permite 0, impede negativo, aceita vazio) */}
+            <FormField
+              control={form.control}
+              name="custo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Custo (R$)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="text" 
+                      placeholder="0.00 (Deixe em branco ou zero se futuro)" 
+                      pattern="[0-9]*[.,]?[0-9]*"
+                      inputMode="decimal"
+                      value={field.value === 0 || field.value === null ? '' : field.value}
+                      onChange={(e) => {
+                        const rawValue = e.target.value.replace(',', '.'); // Normaliza vírgula para ponto
+                        const value = rawValue.trim();
+                        field.onChange(value === '' ? null : parseFloat(value));
+                      }}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Status da Manutenção */}
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01"
-                        placeholder="350.00" 
-                        {...field}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                      />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Status da Manutenção" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    <SelectContent>
+                      <SelectItem value="Agendada">Agendada (A Fazer)</SelectItem>
+                      <SelectItem value="Concluída">Concluída (Finalizada)</SelectItem>
+                      <SelectItem value="Cancelada">Cancelada</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="descricao"
-                render={({ field }) => (
-                  <FormItem className="sm:col-span-2">
-                    <FormLabel>Descrição</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Descreva os serviços realizados na manutenção..."
-                        className="resize-none"
-                        rows={3}
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+            {/* Descrição */}
+            <FormField
+              control={form.control}
+              name="descricao"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Descrição/Observações</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Troca de óleo, filtro, etc." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setOpen(false)}
-                disabled={loading}
-                className="w-full sm:w-auto"
-              >
-                Cancelar
+            <div className="flex gap-2">
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Registrando..." : "Registrar Manutenção"}
               </Button>
-              <Button type="submit" disabled={loading} className="w-full sm:w-auto">
-                {loading ? "Salvando..." : "Salvar Manutenção"}
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} className="w-full">
+                Cancelar
               </Button>
             </div>
           </form>

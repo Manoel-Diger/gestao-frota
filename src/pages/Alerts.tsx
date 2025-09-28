@@ -4,8 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { AlertForm } from "@/components/alerts/AlertForm";
+import { useAlertas } from "@/hooks/useAlertas";
 
 export default function Alerts() {
+  const { alertas, loading, error, refreshAlertas } = useAlertas();
+  
   const alerts = [
     {
       id: 1,
@@ -121,10 +125,7 @@ export default function Alerts() {
           <h1 className="text-3xl font-bold text-foreground">Alertas</h1>
           <p className="text-muted-foreground">Monitore alertas e notificações importantes</p>
         </div>
-        <Button variant="outline">
-          <Settings className="mr-2 h-4 w-4" />
-          Configurar Alertas
-        </Button>
+        <AlertForm onSuccess={refreshAlertas} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -138,43 +139,44 @@ export default function Alerts() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {alerts.map((alert) => (
-                  <div key={alert.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-3 flex-1">
-                        <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center text-white">
-                          {getCategoryIcon(alert.category)}
+              {loading ? (
+                <div className="text-center py-8">Carregando alertas...</div>
+              ) : error ? (
+                <div className="text-center py-8 text-destructive">Erro: {error}</div>
+              ) : alertas.length === 0 ? (
+                <div className="text-center py-8">Nenhum alerta configurado</div>
+              ) : (
+                <div className="space-y-4">
+                  {alertas.map((alerta) => (
+                    <div key={alerta.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 flex-1">
+                          <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center text-white">
+                            <AlertTriangle className="h-4 w-4" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
+                              <h3 className="font-medium">{alerta.tipo_alerta}</h3>
+                              {getPriorityBadge(alerta.prioridade || 'Média')}
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-2">{alerta.descricao}</p>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs text-muted-foreground">
+                              <span>{new Date(alerta.created_at).toLocaleString('pt-BR')}</span>
+                              {alerta.veiculo && <span>Veículo: {alerta.veiculo}</span>}
+                              {alerta.motorista && <span>Motorista: {alerta.motorista}</span>}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-medium">{alert.type}</h3>
-                            {getPriorityBadge(alert.priority)}
-                          </div>
-                          <p className="text-sm text-muted-foreground mb-2">{alert.message}</p>
-                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                            <span>{alert.timestamp}</span>
-                            {alert.vehicle && <span>Veículo: {alert.vehicle}</span>}
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={alerta.ativo ? "bg-success/10 text-success border-success" : "bg-gray-500/10 text-gray-500 border-gray-500"}>
+                            {alerta.ativo ? "Ativo" : "Inativo"}
+                          </Badge>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {getStatusBadge(alert.status)}
-                        {alert.status === "Pendente" && (
-                          <div className="flex gap-1">
-                            <Button size="sm" variant="outline">
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline">
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        )}
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -211,16 +213,20 @@ export default function Alerts() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm">Alertas Pendentes</span>
-                <Badge variant="destructive">2</Badge>
+                <span className="text-sm">Alertas Ativos</span>
+                <Badge className="bg-success/10 text-success border-success">
+                  {alertas.filter(a => a.ativo).length}
+                </Badge>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm">Visualizados</span>
-                <Badge className="bg-warning/10 text-warning border-warning">1</Badge>
+                <span className="text-sm">Alertas Inativos</span>
+                <Badge variant="outline">
+                  {alertas.filter(a => !a.ativo).length}
+                </Badge>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm">Resolvidos (hoje)</span>
-                <Badge className="bg-success/10 text-success border-success">1</Badge>
+                <span className="text-sm">Total de Alertas</span>
+                <Badge variant="secondary">{alertas.length}</Badge>
               </div>
             </CardContent>
           </Card>

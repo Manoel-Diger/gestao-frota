@@ -30,7 +30,8 @@ export default function Vehicles() {
   const filteredVehicles = veiculos.filter(veiculo =>
     (veiculo.placa?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
     (veiculo.modelo?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
-    (veiculo.marca?.toLowerCase().includes(searchTerm.toLowerCase()) || false)
+    (veiculo.marca?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+    (veiculo.motorista?.toLowerCase().includes(searchTerm.toLowerCase()) || false)
   );
 
   const totalVeiculos = veiculos.length;
@@ -123,12 +124,6 @@ export default function Vehicles() {
           </div>
         </CardHeader>
 
-        {/*
-          Envolvemos o Card da tabela com um container que tem overflow-x-auto.
-          Dentro do Card definimos overflow-visible para evitar que o Card corte o scrollbar.
-          Em seguida colocamos um wrapper com min-w para forçar a tabela a ser maior que a viewport
-          e assim aparecer a rolagem horizontal no mobile.
-        */}
         <div className="w-full overflow-x-auto">
           <Card className="overflow-visible">
             <CardContent className="p-4">
@@ -180,7 +175,7 @@ export default function Vehicles() {
                               {veiculo.status || 'N/A'}
                             </Badge>
                           </TableCell>
-                          <TableCell>Não definido</TableCell>
+                          <TableCell>{veiculo.motorista || 'Não definido'}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
@@ -195,7 +190,7 @@ export default function Vehicles() {
                           <TableCell>
                             <div className="flex items-center gap-1 text-sm">
                               <Calendar className="h-3 w-3" />
-                              {veiculo.proxima_manutencao ? new Date(veiculo.proxima_manutencao).toLocaleDateString('pt-BR') : 'N/A'}
+                              {veiculo.proxima_manutencao ? new Date(veiculo.proxima_manutencao).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'N/A'}
                             </div>
                           </TableCell>
                           <TableCell>

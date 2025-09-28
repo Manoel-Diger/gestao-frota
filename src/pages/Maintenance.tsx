@@ -5,27 +5,48 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { useManutencoes } from "@/hooks/useManutencoes";
+// 1. IMPORTAÇÃO NECESSÁRIA: Importar as funções de formatação
+import { formatNumber, formatPercentage } from "@/lib/utils"; 
 
 export default function Maintenance() {
-  const { manutencoes, loading, error } = useManutencoes();
+  // 2. CORREÇÃO PRINCIPAL: Desestruturar o objeto 'stats' do hook
+  const { manutencoes, loading, error, stats, refetch } = useManutencoes();
 
-  const getStatusBadge = (data: string | null) => {
-    if (!data) return <Badge variant="secondary">Sem data</Badge>;
+  // O getStatusBadge parece estar usando 'data' de forma incorreta para status.
+  // Uma manutenção AGENDADA pode ter uma data futura, mas seu STATUS deve ser 'Agendada'.
+  // Para manter a coerência com o Badge de 'Agendada'/'Vendida' na tela:
+  // Vou manter o cálculo abaixo, mas usaremos o 'status' da manutenção para o Badge final na lista.
+  // Este getStatusBadge atual está obsoleto, já que a lista de manutenções
+  // já tem o campo 'status' (Agendada, Concluída) da tabela, como visto na imagem original.
+
+  const getStatusBadge = (status: string) => {
+    // Baseado na imagem original e na lógica de status da tabela Manutencoes:
+    const statusText = status?.toLowerCase();
     
-    const today = new Date();
-    const manutencaoDate = new Date(data);
-    
-    if (manutencaoDate < today) {
-      return <Badge variant="destructive">Vencida</Badge>;
-    } else if (manutencaoDate <= new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)) {
-      return <Badge className="bg-warning/10 text-warning border-warning">Próxima</Badge>;
-    } else {
+    if (statusText === 'agendada') {
+      // Cor de Agendada/Próxima (Verde na sua imagem)
       return <Badge className="bg-success/10 text-success border-success">Agendada</Badge>;
+    } else if (statusText === 'concluída') {
+      // Cor de Concluída/Vendida (Vermelho na sua imagem, mas deveria ser verde/azul)
+      // Vamos manter 'Vendida' com cor Destructive (Vermelha) para reproduzir o visual:
+      return <Badge variant="destructive">Concluída</Badge>;
     }
+    // Caso tenha outros status, você pode adicionar mais condições aqui.
+    return <Badge variant="secondary">{status || 'Status N/A'}</Badge>;
   };
+  
+  // Variáveis para garantir que os balões não quebrem, usando o Nullish Coalescing
+  const total = stats?.total ?? 0;
+  const concluidas = stats?.concluidas ?? 0;
+  const pendentes = stats?.pendentes ?? 0;
+  const custoMedio = stats?.custoMedio ?? 0;
+  const percentualConcluidas = stats?.percentualConcluidas ?? 0;
+  const percentualPendentes = stats?.percentualPendentes ?? 0;
 
-  const totalManutencoes = manutencoes.length;
-  const manutencoesConcluidas = manutencoes.filter(m => m.data && new Date(m.data) < new Date()).length;
+  // Envolver refetch em uma função assíncrona para atender à tipagem esperada por onSuccess
+  const handleOnSuccess = async () => {
+    refetch();
+  };
 
   return (
     <div className="space-y-6">
@@ -35,33 +56,60 @@ export default function Maintenance() {
           <h1 className="text-3xl font-bold text-foreground">Manutenções</h1>
           <p className="text-muted-foreground">Gerencie as manutenções da sua frota</p>
         </div>
-        <MaintenanceForm onSuccess={() => window.location.reload()} />
+        {/* Atualização: Usar handleOnSuccess como callback assíncrono */}
+        <MaintenanceForm onSuccess={handleOnSuccess} /> 
       </div>
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Total Manutenções */}
         <StatsCard
           title="Total Manutenções"
-          value={totalManutencoes.toString()}
+          // 3. ATUALIZAÇÃO: Usar o valor calculado do stats
+          value={total.toString()}
           icon={<Wrench className="h-4 w-4" />}
-          trend={{ value: "0%", isPositive: false }}
+          // 4. ATUALIZAÇÃO: Usar o percentualCorretiva (que você queria calcular)
+          trend={{ 
+            // Usamos o percentualCorretiva para o balão inferior
+            value: formatPercentage(stats?.percentualCorretiva ?? 0), 
+            // Assumimos que percentual Corretiva alto é negativo (false)
+            isPositive: (stats?.percentualCorretiva ?? 0) < 50 // Exemplo de lógica de sinal
+          }}
         />
+        {/* Concluídas */}
         <StatsCard
           title="Concluídas"
-          value={manutencoesConcluidas.toString()}
+          // 3. ATUALIZAÇÃO: Usar o valor calculado do stats
+          value={concluidas.toString()}
           icon={<CheckCircle className="h-4 w-4" />}
-          trend={{ value: "2.1%", isPositive: true }}
+          // 4. ATUALIZAÇÃO: Usar o percentual Concluídas para o balão inferior
+          trend={{ 
+            value: formatPercentage(percentualConcluidas), 
+            // Concluídas sempre é positivo em relação ao total
+            isPositive: true 
+          }}
         />
+        {/* Pendentes */}
         <StatsCard
           title="Pendentes"
-          value={(totalManutencoes - manutencoesConcluidas).toString()}
+          // 3. ATUALIZAÇÃO: Usar o valor calculado do stats
+          value={pendentes.toString()}
           icon={<Calendar className="h-4 w-4" />}
-          trend={{ value: "1.5%", isPositive: false }}
+          // 4. ATUALIZAÇÃO: Usar o percentual Pendentes para o balão inferior
+          trend={{ 
+            value: formatPercentage(percentualPendentes), 
+            // Pendentes sempre é negativo em relação ao total
+            isPositive: false 
+          }}
         />
+        {/* Custo Médio */}
         <StatsCard
           title="Custo Médio"
-          value="R$ 350"
+          // 3. ATUALIZAÇÃO: Usar o valor calculado do stats e formatar como moeda
+          value={formatNumber(custoMedio, 'currency')}
           icon={<AlertTriangle className="h-4 w-4" />}
+          // 4. ATUALIZAÇÃO: Manter um valor hardcoded ou usar uma métrica de tendência, se houver.
+          // Como não temos a tendência do Custo Médio no hook, vou manter o valor estático por segurança:
           trend={{ value: "12%", isPositive: true }}
         />
       </div>
@@ -103,7 +151,8 @@ export default function Maintenance() {
                     <div className="text-center">
                       <p className="text-sm font-medium">Custo</p>
                       <p className="text-sm text-muted-foreground">
-                        {manutencao.custo ? `R$ ${manutencao.custo.toFixed(2)}` : 'N/A'}
+                        {/* Usando formatNumber para garantir a formatação de moeda correta */}
+                        {formatNumber(manutencao.custo ?? 0, 'currency')} 
                       </p>
                     </div>
                     
@@ -115,7 +164,8 @@ export default function Maintenance() {
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      {getStatusBadge(manutencao.data)}
+                      {/* 5. ATUALIZAÇÃO: Usar o campo STATUS para o Badge */}
+                      {getStatusBadge(manutencao.status || 'N/A')}
                       <Button variant="outline" size="sm">
                         Detalhes
                       </Button>

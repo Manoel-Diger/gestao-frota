@@ -8,7 +8,7 @@ import { LogOut } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
-import { useToast } from "./hooks/use-toast";
+import { useToast } from "./components/ui/use-toast";
 import { supabase } from "./integrations/supabase/client";
 
 // Importe seus componentes de layout e páginas
@@ -86,6 +86,29 @@ const App = () => {
     }
   };
 
+  const handleDemoLogin = async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: "demo@exemplo.com",
+        password: "123456",
+      });
+      if (error) throw error;
+      toast({
+        title: "Sucesso!",
+        description: "Login de demonstração realizado com sucesso.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -112,6 +135,17 @@ const App = () => {
               {loading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
+          <div className="mt-4 text-center">
+            <p className="text-sm text-gray-500 dark:text-gray-400">Ou, para uma demonstração:</p>
+            <Button
+              onClick={handleDemoLogin}
+              variant="outline"
+              className="w-full mt-2"
+              disabled={loading}
+            >
+              Acessar com Usuário de Demonstração
+            </Button>
+          </div>
         </div>
       </div>
     );
