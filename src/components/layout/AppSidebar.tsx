@@ -9,6 +9,7 @@ import {
   Settings,
   Home,
   FileText,
+  List, // Adicionado para representar Checklist
 } from "lucide-react";
 
 import {
@@ -31,6 +32,7 @@ const navigationItems = [
   { title: "Abastecimentos", url: "/fuel", icon: Fuel },
   { title: "Relatórios", url: "/reports", icon: BarChart3 },
   { title: "Alertas", url: "/alerts", icon: AlertTriangle },
+  { title: "Checklist", url: "/checklist", icon: List }, // Novo item adicionado
 ];
 
 const settingsItems = [

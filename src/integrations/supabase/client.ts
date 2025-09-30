@@ -13,5 +13,28 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+    detectSessionInUrl: true,
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'gestao-frota@1.0.0',
+    },
+  },
+  db: {
+    schema: 'public',
+  },
 });
+
+// Helper function to check if client is connected
+export const checkSupabaseConnection = async () => {
+  try {
+    const { data, error } = await supabase.from('Veiculos').select('count', { count: 'exact', head: true });
+    return !error;
+  } catch (error) {
+    console.error('Supabase connection error:', error);
+    return false;
+  }
+};
+
+// Export database types for convenience
+export type { Database } from './types';
