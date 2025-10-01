@@ -12,16 +12,13 @@ import { useMotoristas } from '@/hooks/useMotoristas';
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-
 export default function ChecklistPage() {
-  // Hooks dos dados
   const { checklists, loading, refetch, deleteChecklist, error } = useChecklists();
   const { motoristas } = useMotoristas();
   const [showForm, setShowForm] = useState(false);
   const [selectedChecklist, setSelectedChecklist] = useState<ChecklistDisplay | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
-  // Função para obter nome do motorista por ID
   const getMotoristaNome = (id: number | string) => {
     const motorista = motoristas.find(m => m.id.toString() === id.toString());
     return motorista ? motorista.nome : id;
@@ -41,24 +38,26 @@ export default function ChecklistPage() {
 
   const calculateStats = () => {
     if (!checklists || checklists.length === 0) {
-      return { approvedPercentage: 0, totalChecklists: 0, avgNonConformities: 0 };
+      return { approvedPercentage: 0, totalChecklists: 0, avgNonConformities: 0, reprovedPercentage: 0 };
     }
 
     const approved = checklists.filter(c => c.status_final === 'APROVADO').length;
+    const reproved = checklists.length - approved;
     const totalNonConformities = checklists.reduce((sum, c) => sum + (c.total_nao_conformidades || 0), 0);
-    const avg = totalNonConformities / checklists.length;
+    const avgNonConformities = totalNonConformities / checklists.length;
 
     return {
       approvedPercentage: Math.round((approved / checklists.length) * 100),
       totalChecklists: checklists.length,
-      avgNonConformities: parseFloat(avg.toFixed(1)),
+      avgNonConformities: parseFloat(avgNonConformities.toFixed(1)),
+      reprovedPercentage: Math.round((reproved / checklists.length) * 100),
     };
   };
 
   const stats = calculateStats();
 
-  const getStatusBadge = (status: string) => {
-    return status === 'APROVADO' ? (
+  const getStatusBadge = (status: string) =>
+    status === 'APROVADO' ? (
       <Badge className="bg-green-500 hover:bg-green-600">
         <CheckCircle className="w-3 h-3 mr-1" />
         Aprovado
@@ -69,7 +68,6 @@ export default function ChecklistPage() {
         Reprovado
       </Badge>
     );
-  };
 
   const renderChecklistDetails = () => {
     if (!selectedChecklist) return null;
@@ -131,9 +129,9 @@ export default function ChecklistPage() {
             <h4 className="font-medium mb-3">Imagens Anexadas</h4>
             <div className="grid grid-cols-2 gap-2">
               {selectedChecklist.imagens.map((img: string, index: number) => (
-                <img
-                  key={index}
-                  src={img}
+                <img 
+                  key={index} 
+                  src={img} 
                   alt={`Imagem ${index + 1}`}
                   className="w-full h-32 object-cover rounded border"
                 />
@@ -147,6 +145,7 @@ export default function ChecklistPage() {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Checklists Veiculares</h1>
@@ -160,7 +159,8 @@ export default function ChecklistPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">% Aprovados</CardTitle>
@@ -199,8 +199,22 @@ export default function ChecklistPage() {
             </p>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">% Checklists Reprovados</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">{stats.reprovedPercentage}%</div>
+            <p className="text-xs text-muted-foreground">
+              Por checklist
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
+      {/* Table */}
       <Card>
         <CardHeader>
           <CardTitle>Lista de Checklists</CardTitle>
@@ -240,11 +254,9 @@ export default function ChecklistPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {checklists?.map((checklist) => (
+                  {checklists.map((checklist) => (
                     <TableRow key={checklist.id}>
-                      <TableCell>
-                        {format(new Date(checklist.data_inspecao), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                      </TableCell>
+                      <TableCell>{format(new Date(checklist.data_inspecao), "dd/MM/yyyy HH:mm", { locale: ptBR })}</TableCell>
                       <TableCell className="font-medium">{getMotoristaNome(checklist.motorista)}</TableCell>
                       <TableCell>{checklist.placa_veiculo}</TableCell>
                       <TableCell>
@@ -258,18 +270,10 @@ export default function ChecklistPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewDetails(checklist)}
-                          >
+                          <Button variant="outline" size="sm" onClick={() => handleViewDetails(checklist)}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDelete(checklist.id)}
-                          >
+                          <Button variant="outline" size="sm" onClick={() => handleDelete(checklist.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Bell, Search, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 
 export function AppHeader() {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    // Aqui você pode propagar para contexto ou via callback se precisar filtrar listas em outras páginas
+  };
+
   return (
     <header className="h-16 bg-fleet-header border-b border-border flex items-center justify-between px-6 shadow-sm">
       <div className="flex items-center gap-4">
@@ -23,16 +31,18 @@ export function AppHeader() {
           <Input
             placeholder="Buscar veículos, motoristas..."
             className="pl-10 w-full md:w-96"
+            value={searchTerm}
+            onChange={handleSearchChange}
           />
         </div>
       </div>
 
       <div className="flex items-center gap-4">
         {/* Notifications */}
-        <Button variant="outline" size="icon" className="relative">
+        <Button variant="outline" size="icon" className="relative" aria-label="Notificações">
           <Bell className="h-4 w-4" />
-          <Badge 
-            variant="destructive" 
+          <Badge
+            variant="destructive"
             className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
           >
             3
@@ -50,7 +60,7 @@ export function AppHeader() {
                 </AvatarFallback>
               </Avatar>
               <div className="hidden md:block text-left">
-                <p className="text-sm font-medium">João Silva</p>
+                <p className="text-sm font-medium">Manoel Armenteiro</p>
                 <p className="text-xs text-muted-foreground">Administrador</p>
               </div>
             </Button>
