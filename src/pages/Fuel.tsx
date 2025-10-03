@@ -3,7 +3,6 @@ import { Fuel, TrendingDown, TrendingUp, DollarSign, Search, AlertTriangle } fro
 import { FuelForm } from "@/components/fuel/FuelForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -19,12 +18,7 @@ export default function FuelPage() {
   const { abastecimentos, loading, error, refetch } = useAbastecimentos();
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Cálculo das estatísticas
-  const totalGasto = abastecimentos.reduce((sum, ab) => sum + (ab.custo_total || 0), 0);
-  const totalLitros = abastecimentos.reduce((sum, ab) => sum + (ab.litros || 0), 0);
-  const precoMedio = totalLitros > 0 ? totalGasto / totalLitros : 0;
-
-  // Filtragem local baseada no termo de busca
+  // Filtragem com useMemo
   const filteredAbastecimentos = useMemo(() => {
     if (!abastecimentos) return [];
     const lowerCaseSearch = searchTerm.toLowerCase().trim();
@@ -38,10 +32,21 @@ export default function FuelPage() {
     });
   }, [abastecimentos, searchTerm]);
 
+  // Cálculos dinâmicos por filtro
+  const stats = useMemo(() => {
+    const filtered = searchTerm ? filteredAbastecimentos : abastecimentos;
+    const totalGasto = filtered.reduce((sum, ab) => sum + (Number(ab.custo_total) || 0), 0);
+    const totalLitros = filtered.reduce((sum, ab) => sum + (Number(ab.litros) || 0), 0);
+    const totalAbastecimentos = filtered.length;
+    const precoMedioGeral = totalLitros > 0 ? totalGasto / totalLitros : 0;
+
+    return { totalGasto, totalLitros, totalAbastecimentos, precoMedioGeral };
+  }, [abastecimentos, filteredAbastecimentos, searchTerm]);
+
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto py-6 space-y-6 px-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Abastecimentos</h1>
           <p className="text-muted-foreground">Controle de combustível da sua frota</p>
@@ -50,7 +55,7 @@ export default function FuelPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Gasto Total</CardTitle>
@@ -58,9 +63,11 @@ export default function FuelPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              R$ {totalGasto.toFixed(2)}
+              R$ {stats.totalGasto.toFixed(2)}
             </div>
-            <p className="text-xs text-muted-foreground">Gasto acumulado</p>
+            <p className="text-xs text-muted-foreground">
+              {searchTerm ? 'Filtrado' : 'Gasto acumulado'}
+            </p>
           </CardContent>
         </Card>
 
@@ -70,8 +77,10 @@ export default function FuelPage() {
             <Fuel className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalLitros.toFixed(1)}L</div>
-            <p className="text-xs text-muted-foreground">Total consumido</p>
+            <div className="text-2xl font-bold">{stats.totalLitros.toFixed(1)}L</div>
+            <p className="text-xs text-muted-foreground">
+              {searchTerm ? 'Filtrado' : 'Total consumido'}
+            </p>
           </CardContent>
         </Card>
 
@@ -81,8 +90,10 @@ export default function FuelPage() {
             <TrendingUp className="h-4 w-4 text-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{abastecimentos.length}</div>
-            <p className="text-xs text-muted-foreground">Abastecimentos realizados</p>
+            <div className="text-2xl font-bold">{stats.totalAbastecimentos}</div>
+            <p className="text-xs text-muted-foreground">
+              {searchTerm ? 'Filtrado' : 'Abastecimentos realizados'}
+            </p>
           </CardContent>
         </Card>
 
@@ -93,9 +104,11 @@ export default function FuelPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              R$ {precoMedio.toFixed(2)}
+              R$ {stats.precoMedioGeral.toFixed(2)}
             </div>
-            <p className="text-xs text-muted-foreground">Média por litro</p>
+            <p className="text-xs text-muted-foreground">
+              {searchTerm ? 'Filtrado' : 'Média geral por litro'}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -113,9 +126,6 @@ export default function FuelPage() {
                 className="pl-10"
               />
             </div>
-            <Button variant="outline" disabled>
-              Filtros
-            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -124,7 +134,7 @@ export default function FuelPage() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
           ) : error ? (
-            <div className="flex flex-col items-center justify-center py-8 text-red-500">
+            <div className="flex flex-col items-center justify-center py-8 text-destructive">
               <AlertTriangle className="h-6 w-6 mb-2" />
               <p>Erro ao carregar abastecimentos. Verifique sua conexão.</p>
               <Button variant="link" onClick={refetch}>Tentar Novamente</Button>
@@ -137,7 +147,7 @@ export default function FuelPage() {
                   ? "Nenhum abastecimento encontrado para sua pesquisa."
                   : "Nenhum abastecimento encontrado."}
               </p>
-              {!searchTerm && <p className="text-sm">Clique em 'Novo' para começar.</p>}
+              {!searchTerm && <p className="text-sm mt-2">Clique em 'Novo Abastecimento' para começar.</p>}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -146,33 +156,41 @@ export default function FuelPage() {
                   <TableRow>
                     <TableHead>Placa</TableHead>
                     <TableHead>Data</TableHead>
-                    <TableHead>Litros</TableHead>
-                    <TableHead>Valor Total</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
+                    <TableHead className="text-right">Litros</TableHead>
+                    <TableHead className="text-right">Km</TableHead>
+                    <TableHead className="text-right">Valor Total</TableHead>
+                    <TableHead className="text-right">R$/L</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredAbastecimentos.map((abastecimento) => (
-                    <TableRow key={abastecimento.id.toString()}> {/* Key como string para React */}
-                      <TableCell className="font-medium">
-                        {abastecimento.veiculo_placa || "N/A"}
-                      </TableCell>
-                      <TableCell>
-                        {abastecimento.data
-                          ? new Date(abastecimento.data).toLocaleDateString("pt-BR")
-                          : "N/A"}
-                      </TableCell>
-                      <TableCell>{abastecimento.litros || 0}L</TableCell>
-                      <TableCell>
-                        R$ {(abastecimento.custo_total || 0).toFixed(2)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm">
-                          Detalhes
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {filteredAbastecimentos.map((abastecimento) => {
+                    const custoTotal = Number(abastecimento.custo_total) || 0;
+                    const litros = Number(abastecimento.litros) || 0;
+                    const precoLitro = litros > 0 ? custoTotal / litros : 0;
+                    
+                    return (
+                      <TableRow key={abastecimento.id.toString()}>
+                        <TableCell className="font-medium">
+                          {abastecimento.veiculo_placa || "N/A"}
+                        </TableCell>
+                        <TableCell>
+                          {abastecimento.data
+                            ? new Date(abastecimento.data + 'T12:00:00').toLocaleDateString("pt-BR")
+                            : "N/A"}
+                        </TableCell>
+                        <TableCell className="text-right">{litros.toFixed(1)}L</TableCell>
+                        <TableCell className="text-right">
+                          {abastecimento.quilometragem?.toLocaleString('pt-BR') || '-'}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          R$ {custoTotal.toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          R$ {precoLitro.toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
