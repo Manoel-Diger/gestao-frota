@@ -33,6 +33,9 @@ import { useVeiculos } from "@/hooks/useVeiculos";
 import { useMotoristas } from "@/hooks/useMotoristas";
 import { Plus } from "lucide-react";
 
+// Constante para substituir o valor vazio ("")
+const NULL_VALUE = "NULL_PLACEHOLDER";
+
 const alertSchema = z.object({
   tipo_alerta: z.enum(["Manutenção Vencida", "CNH Vencendo", "Combustível Baixo", "Comportamento"]),
   veiculo: z.string().optional(),
@@ -59,8 +62,8 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
     resolver: zodResolver(alertSchema),
     defaultValues: {
       tipo_alerta: "Manutenção Vencida",
-      veiculo: "",
-      motorista: "",
+      veiculo: NULL_VALUE,
+      motorista: NULL_VALUE,
       prioridade: "Média",
       descricao: "",
       ativo: "Sim",
@@ -70,12 +73,16 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
   const onSubmit = async (data: AlertFormData) => {
     try {
       setLoading(true);
+
+      // Lógica de conversão: se o valor for NULL_PLACEHOLDER, envie null para o Supabase
+      const veiculoToSend = data.veiculo === NULL_VALUE ? null : data.veiculo;
+      const motoristaToSend = data.motorista === NULL_VALUE ? null : data.motorista;
       
       const { error } = await supabase
         .rpc('insert_alerta', {
           p_tipo_alerta: data.tipo_alerta,
-          p_veiculo: data.veiculo || null,
-          p_motorista: data.motorista || null,
+          p_veiculo: veiculoToSend,
+          p_motorista: motoristaToSend,
           p_prioridade: data.prioridade,
           p_descricao: data.descricao,
           p_ativo: data.ativo === "Sim",
@@ -88,7 +95,14 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
         description: "Alerta configurado com sucesso.",
       });
 
-      form.reset();
+      form.reset({
+        tipo_alerta: "Manutenção Vencida",
+        veiculo: NULL_VALUE,
+        motorista: NULL_VALUE,
+        prioridade: "Média",
+        descricao: "",
+        ativo: "Sim",
+      });
       setOpen(false);
       onSuccess?.();
     } catch (error) {
@@ -106,8 +120,10 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="bg-gradient-primary hover:bg-primary-hover w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Alerta
+          <span className="flex items-center">
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Alerta
+          </span>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -184,10 +200,13 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Nenhum</SelectItem>
+                          <SelectItem value={NULL_VALUE}>Nenhum</SelectItem>
                           {veiculos.map((veiculo) => (
-                            <SelectItem key={veiculo.id} value={veiculo.placa || ''}>
-                              {veiculo.placa} - {veiculo.marca} {veiculo.modelo}
+                            <SelectItem 
+                              key={veiculo.id} 
+                              value={veiculo.placa || `VEICULO_${veiculo.id}`}
+                            >
+                              {veiculo.placa || 'N/A'} - {veiculo.marca} {veiculo.modelo}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -210,10 +229,13 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">Nenhum</SelectItem>
+                          <SelectItem value={NULL_VALUE}>Nenhum</SelectItem>
                           {motoristas.map((motorista) => (
-                            <SelectItem key={motorista.id} value={motorista.nome || ''}>
-                              {motorista.nome}
+                            <SelectItem 
+                              key={motorista.id} 
+                              value={motorista.nome || `MOTORISTA_${motorista.id}`}
+                            >
+                              {motorista.nome || 'N/A'}
                             </SelectItem>
                           ))}
                         </SelectContent>

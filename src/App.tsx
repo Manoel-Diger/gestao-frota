@@ -1,5 +1,6 @@
+// src/app/tsx (CÓDIGO COMPLETO COM MANUTENÇÃO)
+
 import React, { useState, useEffect } from "react";
-// Importações corrigidas de caminhos relativos
 import { Toaster } from "./components/ui/toaster";
 import { Toaster as Sonner } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
@@ -12,7 +13,7 @@ import { Label } from "./components/ui/label";
 import { useToast } from "./components/ui/use-toast";
 import { supabase } from "./integrations/supabase/client";
 
-// Importe seus componentes de layout e páginas (Caminhos corrigidos)
+// Importe seus componentes de layout e páginas
 import { AppLayout } from "./components/layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import Vehicles from "./pages/Vehicles";
@@ -22,39 +23,40 @@ import FuelPage from "./pages/Fuel";
 import Reports from "./pages/Reports";
 import Alerts from "./pages/Alerts";
 import NotFound from "./pages/NotFound";
-// Importação da nova página Checklist
+
+// 🛑 CORREÇÃO 1: Voltar para importação default. 
+// A imagem do Checklist.tsx (387d04.png) mostra 'export default function...'
 import ChecklistPage from "./pages/Checklist"; 
 
 const queryClient = new QueryClient();
 
 // Componente Wrapper para lidar com a navegação fora do escopo do BrowserRouter
 const AppWrapper = () => (
-    <BrowserRouter>
-        <AppContent />
-    </BrowserRouter>
+    <BrowserRouter>
+        <AppContent />
+    </BrowserRouter>
 );
 
 const AppContent = () => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const navigate = useNavigate(); // Hook de navegação
+  const navigate = useNavigate(); 
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setUser(session?.user ?? null);
         setLoading(false);
-        // Após o logout ou login, pode ser útil redirecionar o usuário
-        if (!session && event === 'SIGNED_OUT') {
-            navigate('/');
-        }
+        if (!session && event === 'SIGNED_OUT') {
+            navigate('/');
+        }
       }
     );
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [navigate]); // Adicionado 'navigate' como dependência
+  }, [navigate]); 
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -175,36 +177,25 @@ const AppContent = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        {/*
-          O cabeçalho foi movido para fora das rotas e deve ficar antes delas.
-          A estrutura de rotas (Routes e Route) deve estar dentro do BrowserRouter (que está no AppWrapper).
-        */}
-        <div className="w-full max-w-4xl mx-auto space-y-8">
-            <header className="flex justify-between items-center py-4">
-                <h1 className="text-2xl font-bold">Gerenciador de Frota</h1>
-                <div className="flex items-center space-x-2">
-                    <p className="hidden sm:block">Logado como: {user.email}</p>
-                    <Button variant="ghost" onClick={handleLogout} disabled={loading} className="flex items-center">
-                        <LogOut className="mr-2 h-4 w-4" /> Sair
-                    </Button>
-                </div>
-            </header>
-        </div>
-        <Routes>
-            <Route path="/" element={<AppLayout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="vehicles" element={<Vehicles />} />
-                <Route path="drivers" element={<Drivers />} />
-                <Route path="maintenance" element={<Maintenance />} />
-                <Route path="fuel" element={<FuelPage />} />
-                <Route path="reports" element={<Reports />} />
-                <Route path="alerts" element={<Alerts />} />
-                <Route path="checklist" element={<ChecklistPage />} />
-                <Route path="settings" element={<Dashboard />} />
-                <Route path="docs" element={<Dashboard />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Routes>
+            {/* 🛑 CORREÇÃO 2: Removendo as props handleLogout/loading/user do elemento da rota. */}
+            <Route 
+              path="/" 
+              element={<AppLayout />}
+            >
+                <Route index element={<Dashboard />} />
+                <Route path="vehicles" element={<Vehicles />} />
+                <Route path="drivers" element={<Drivers />} />
+                <Route path="maintenance" element={<Maintenance />} />
+                <Route path="fuel" element={<FuelPage />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="alerts" element={<Alerts />} />
+                <Route path="checklist" element={<ChecklistPage />} />
+                <Route path="settings" element={<Dashboard />} />
+                <Route path="docs" element={<Dashboard />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+        </Routes>
       </TooltipProvider>
     </QueryClientProvider>
   );
