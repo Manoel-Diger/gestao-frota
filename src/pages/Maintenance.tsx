@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Wrench, DollarSign, TrendingUp, Calendar, AlertTriangle, Search } from "lucide-react";
+import { Wrench, DollarSign, TrendingUp, Calendar, Search, Eye, Pencil, Trash2, CheckCircle } from "lucide-react";
 import { MaintenanceForm } from "@/components/maintenance/MaintenanceForm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useManutencoes } from "@/hooks/useManutencoes";
+import { Tables } from "@/integrations/supabase/types";
+
+type Manutencao = Tables<'Manutencoes'>;
 
 export default function Maintenance() {
-  const { manutencoes, loading, error, refetch } = useManutencoes();
+  const { manutencoes, loading, error, refetch, deleteManutencao } = useManutencoes();
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // BUG #2 CORRIGIDO: Estados para controlar edição
+  const [editingManutencao, setEditingManutencao] = useState<Manutencao | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // Filtragem com useMemo
   const filteredManutencoes = useMemo(() => {
@@ -36,43 +43,118 @@ export default function Maintenance() {
     });
   }, [manutencoes, searchTerm]);
 
-  // Cálculos dinâmicos por filtro
+  // Funções helper para normalização de status
+  const normalizeStatus = (status: string | null) =>
+    (status || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+
+  const statusKey = (status: string | null) => {
+    const s = normalizeStatus(status);
+    if (s.includes("agendada") || s.includes("a fazer")) return "agendada";
+    if (s.includes("concluida") || s.includes("finalizada")) return "concluida";
+    if (s.includes("cancelada")) return "cancelada";
+    return "outro";
+  };
+
+  // BUG #1 CORRIGIDO: Cálculos sempre sobre filteredManutencoes
   const stats = useMemo(() => {
-    const filtered = searchTerm ? filteredManutencoes : manutencoes;
-    const totalCusto = filtered.reduce((sum, man) => sum + (Number(man.custo) || 0), 0);
-    const totalManutencoes = filtered.length;
+    // SEMPRE usar filteredManutencoes, que já contém a lista correta (completa ou filtrada)
+    const totalCusto = filteredManutencoes.reduce((sum, man) => {
+      const custo = typeof man.custo === 'number' ? man.custo : parseFloat(String(man.custo || 0));
+      return sum + custo;
+    }, 0);
+    
+    const totalManutencoes = filteredManutencoes.length;
     const custoMedio = totalManutencoes > 0 ? totalCusto / totalManutencoes : 0;
+
+    // Contar status sobre a lista filtrada
+    const agendadas = filteredManutencoes.filter((m) => 
+      statusKey((m as any).status) === 'agendada'
+    ).length;
     
-    // Conta manutenções agendadas vs concluídas
-    const agendadas = filtered.filter(m => m.status === 'Agendada').length;
-    const concluidas = filtered.filter(m => m.status === 'Concluída').length;
-    
-    // Conta manutenções por tipo
-    const preventivas = filtered.filter(m => 
-      m.tipo_manutencao?.toLowerCase().includes('preventiva')
+    const concluidas = filteredManutencoes.filter((m) => 
+      statusKey((m as any).status) === 'concluida'
     ).length;
 
-    return { 
-      totalCusto, 
-      custoMedio, 
-      totalManutencoes, 
+    return {
+      totalCusto,
+      custoMedio,
+      totalManutencoes,
       agendadas,
       concluidas,
-      preventivas 
     };
-  }, [manutencoes, filteredManutencoes, searchTerm]);
+  }, [filteredManutencoes]); // Dependência ÚNICA: filteredManutencoes
 
-  const getStatusVariant = (status: string | null) => {
-    switch (status) {
-      case 'Concluída':
-        return 'default';
-      case 'Em Andamento':
-        return 'secondary';
-      case 'Agendada':
-        return 'outline';
+  // Badges com cores usando classes do Tailwind existentes
+  const getStatusBadge = (status: string | null) => {
+    const key = statusKey(status);
+    const displayText = status || 'Agendada';
+    
+    switch (key) {
+      case "concluida":
+        return (
+          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white border-0">
+            {displayText}
+          </Badge>
+        );
+      case "cancelada":
+        return <Badge variant="destructive">{displayText}</Badge>;
+      case "agendada":
+        return (
+          <Badge className="bg-amber-500 hover:bg-amber-600 text-white border-0">
+            {displayText}
+          </Badge>
+        );
       default:
-        return 'outline';
+        return <Badge variant="outline">{displayText}</Badge>;
     }
+  };
+
+  const handleView = (id: number) => {
+    const manutencao = manutencoes.find(m => m.id === id);
+    if (manutencao) {
+      console.log("📋 Visualizar manutenção:", manutencao);
+      // TODO: Implementar modal de visualização (read-only)
+      alert(`Visualização:\n\nPlaca: ${manutencao.veiculo_placa}\nTipo: ${manutencao.tipo_manutencao}\nCusto: R$ ${typeof manutencao.custo === 'number' ? manutencao.custo.toFixed(2) : '0.00'}`);
+    }
+  };
+
+  // BUG #2 CORRIGIDO: Implementar edição real
+  const handleEdit = (id: number) => {
+    const manutencao = manutencoes.find(m => m.id === id);
+    if (manutencao) {
+      console.log("✏️ Editar manutenção:", manutencao);
+      setEditingManutencao(manutencao);
+      setIsEditDialogOpen(true);
+    }
+  };
+
+  // BUG #2 CORRIGIDO: Implementar exclusão real
+  const handleDelete = async (id: number) => {
+    const manutencao = manutencoes.find(m => m.id === id);
+    if (!manutencao) return;
+
+    const confirmMsg = `Tem certeza que deseja excluir esta manutenção?\n\nPlaca: ${manutencao.veiculo_placa}\nTipo: ${manutencao.tipo_manutencao}`;
+    
+    if (confirm(confirmMsg)) {
+      console.log("🗑️ Excluindo manutenção:", id);
+      const success = await deleteManutencao(id);
+      if (success) {
+        console.log("✅ Manutenção excluída com sucesso");
+      } else {
+        console.error("🔴 Erro ao excluir manutenção");
+        alert("Erro ao excluir manutenção. Verifique as permissões.");
+      }
+    }
+  };
+
+  const handleEditSuccess = async () => {
+    await refetch();
+    setIsEditDialogOpen(false);
+    setEditingManutencao(null);
   };
 
   return (
@@ -86,6 +168,20 @@ export default function Maintenance() {
         <MaintenanceForm onSuccess={refetch} />
       </div>
 
+      {/* Dialog de Edição Separado */}
+      {editingManutencao && (
+        <MaintenanceForm
+          initialData={editingManutencao}
+          mode="edit"
+          open={isEditDialogOpen}
+          onOpenChange={(open) => {
+            setIsEditDialogOpen(open);
+            if (!open) setEditingManutencao(null);
+          }}
+          onSuccess={handleEditSuccess}
+        />
+      )}
+
       {/* Stats Cards - 5 cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
@@ -95,7 +191,7 @@ export default function Maintenance() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              R$ {stats.totalCusto.toFixed(2)}
+              R$ {stats.totalCusto.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
               {searchTerm ? 'Filtrado' : 'Custo acumulado'}
@@ -110,7 +206,7 @@ export default function Maintenance() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              R$ {stats.custoMedio.toFixed(2)}
+              R$ {stats.custoMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <p className="text-xs text-muted-foreground">
               {searchTerm ? 'Filtrado' : 'Por manutenção'}
@@ -139,20 +235,20 @@ export default function Maintenance() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.agendadas}</div>
             <p className="text-xs text-muted-foreground">
-              {stats.concluidas} concluídas
+              Manutenções agendadas
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Preventivas</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            <CardTitle className="text-sm font-medium">Concluídas</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.preventivas}</div>
+            <div className="text-2xl font-bold">{stats.concluidas}</div>
             <p className="text-xs text-muted-foreground">
-              Manutenções preventivas
+              Manutenções concluídas
             </p>
           </CardContent>
         </Card>
@@ -180,7 +276,7 @@ export default function Maintenance() {
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-8 text-destructive">
-              <AlertTriangle className="h-6 w-6 mb-2" />
+              <Wrench className="h-6 w-6 mb-2" />
               <p>Erro ao carregar manutenções. Verifique sua conexão.</p>
               <Button variant="link" onClick={refetch}>Tentar Novamente</Button>
             </div>
@@ -204,12 +300,14 @@ export default function Maintenance() {
                     <TableHead>Data</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Custo</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
+                    <TableHead className="text-center">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredManutencoes.map((manutencao) => {
-                    const custo = Number(manutencao.custo) || 0;
+                    const custo = typeof manutencao.custo === 'number' 
+                      ? manutencao.custo 
+                      : parseFloat(String(manutencao.custo || 0));
                     
                     return (
                       <TableRow key={manutencao.id.toString()}>
@@ -227,17 +325,39 @@ export default function Maintenance() {
                             : "N/A"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={getStatusVariant(manutencao.status)}>
-                            {manutencao.status || 'Agendada'}
-                          </Badge>
+                          {getStatusBadge((manutencao as any).status)}
                         </TableCell>
                         <TableCell className="text-right">
-                          R$ {custo.toFixed(2)}
+                          R$ {custo.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="outline" size="sm">
-                            Detalhes
-                          </Button>
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleView(manutencao.id)}
+                              title="Visualizar"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(manutencao.id)}
+                              title="Editar"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(manutencao.id)}
+                              title="Excluir"
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
