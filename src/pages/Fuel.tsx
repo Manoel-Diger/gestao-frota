@@ -1,6 +1,8 @@
 import { useState, useMemo } from "react";
-import { Fuel, TrendingDown, TrendingUp, DollarSign, Search, AlertTriangle } from "lucide-react";
+import { Fuel, TrendingDown, TrendingUp, DollarSign, Search, AlertTriangle, Eye, Pencil, Trash2 } from "lucide-react";
 import { FuelForm } from "@/components/fuel/FuelForm";
+import { FuelViewDialog } from "@/components/fuel/FuelViewDialog";
+import { FuelEditDialog } from "@/components/fuel/FuelEditDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,10 +15,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAbastecimentos } from "@/hooks/useAbastecimentos";
+import { useToast } from "@/hooks/use-toast";
+import { Tables } from "@/integrations/supabase/types";
+
+type Abastecimento = Tables<'Abastecimentos'>;
 
 export default function FuelPage() {
-  const { abastecimentos, loading, error, refetch } = useAbastecimentos();
+  const { abastecimentos, loading, error, refetch, deleteAbastecimento } = useAbastecimentos();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [viewAbastecimento, setViewAbastecimento] = useState<Abastecimento | null>(null);
+  const [editAbastecimento, setEditAbastecimento] = useState<Abastecimento | null>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   // Filtragem com useMemo
   const filteredAbastecimentos = useMemo(() => {
@@ -42,6 +53,35 @@ export default function FuelPage() {
 
     return { totalGasto, totalLitros, totalAbastecimentos, precoMedioGeral };
   }, [abastecimentos, filteredAbastecimentos, searchTerm]);
+
+  const handleView = (abastecimento: Abastecimento) => {
+    setViewAbastecimento(abastecimento);
+    setViewDialogOpen(true);
+  };
+
+  const handleEdit = (abastecimento: Abastecimento) => {
+    setEditAbastecimento(abastecimento);
+    setEditDialogOpen(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm("Tem certeza que deseja excluir este abastecimento?")) {
+      const success = await deleteAbastecimento(id);
+      if (success) {
+        toast({
+          title: "Sucesso!",
+          description: "Abastecimento excluído com sucesso.",
+        });
+        refetch();
+      } else {
+        toast({
+          title: "Erro",
+          description: "Falha ao excluir o abastecimento.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
 
   return (
     <div className="container mx-auto py-6 space-y-6 px-4">
@@ -160,6 +200,7 @@ export default function FuelPage() {
                     <TableHead className="text-right">Km</TableHead>
                     <TableHead className="text-right">Valor Total</TableHead>
                     <TableHead className="text-right">R$/L</TableHead>
+                    <TableHead className="text-center">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -188,6 +229,35 @@ export default function FuelPage() {
                         <TableCell className="text-right">
                           R$ {precoLitro.toFixed(2)}
                         </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleView(abastecimento)}
+                              title="Visualizar"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(abastecimento)}
+                              title="Editar"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(abastecimento.id)}
+                              title="Excluir"
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     );
                   })}
@@ -197,6 +267,19 @@ export default function FuelPage() {
           )}
         </CardContent>
       </Card>
+
+      <FuelViewDialog
+        abastecimento={viewAbastecimento}
+        open={viewDialogOpen}
+        onOpenChange={setViewDialogOpen}
+      />
+
+      <FuelEditDialog
+        abastecimento={editAbastecimento}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSuccess={refetch}
+      />
     </div>
   );
 }
