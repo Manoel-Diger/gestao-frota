@@ -273,18 +273,18 @@ export default function Vehicles() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleView(veiculo)}
+                            onClick={() => handleDetails(veiculo)}
                             title="Visualizar"
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
                           </Button>
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
                             onClick={() => handleEdit(veiculo)}
                             title="Editar"
                           >
-                            Editar
+                            <Pencil className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>

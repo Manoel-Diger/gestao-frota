@@ -31,7 +31,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
 
-// ✅ Corrigido o tipo de motorista_id para aceitar number ou string (conversão controlada)
 const vehicleSchema = z.object({
   placa: z
     .string()
@@ -43,7 +42,7 @@ const vehicleSchema = z.object({
     .number()
     .min(1990, "Ano deve ser maior que 1990")
     .max(new Date().getFullYear() + 1, "Ano inválido"),
-  status: z.enum(["Ativo", "Em Manutenção", "Inativo"]),
+  status: z.enum(["Ativo", "Em Manutenção", "Inativo", "Em uso", "Disponível"]),
   quilometragem: z.number().min(0, "Quilometragem deve ser positiva"),
   tipo_combustivel: z.enum(["Gasolina", "Etanol", "Diesel", "Flex"]),
   proxima_manutencao: z
@@ -54,7 +53,7 @@ const vehicleSchema = z.object({
     .number()
     .min(0, "Nível de combustível deve ser entre 0 e 100")
     .max(100, "Nível de combustível deve ser entre 0 e 100"),
-  motorista_id: z.union([z.string(), z.number()]).optional().nullable(),
+  motorista_id: z.string().optional(),
 });
 
 type VehicleFormData = z.infer<typeof vehicleSchema>;
@@ -82,29 +81,38 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
       proxima_manutencao: "",
       localizacao: "",
       combustivel_atual: 100,
-      motorista_id: null,
+      motorista_id: "none",
     },
   });
 
-  // 🔹 Busca motoristas com id numérico
   useEffect(() => {
-    const fetchMotoristas = async () => {
-      const { data, error } = await supabase
-        .from("Motoristas")
-        .select("id, nome")
-        .order("nome", { ascending: true });
+    if (open) {
+      const fetchMotoristas = async () => {
+        try {
+          const { data, error } = await supabase
+            .from("Motoristas")
+            .select("id, nome")
+            .order("nome", { ascending: true });
 
-      if (!error && data) {
-        setMotoristas(data);
-      } else if (error) {
-        console.error("Erro ao buscar motoristas:", error.message);
-      }
-    };
+          if (error) throw error;
 
-    fetchMotoristas();
-  }, []);
+          if (data) {
+            setMotoristas(data);
+          }
+        } catch (err) {
+          console.error("Erro ao buscar motoristas:", err);
+          toast({
+            title: "Aviso",
+            description: "Não foi possível carregar a lista de motoristas",
+            variant: "destructive",
+          });
+        }
+      };
 
-  // 🔹 Inserção no Supabase com tipos consistentes
+      fetchMotoristas();
+    }
+  }, [open, toast]);
+
   const onSubmit = async (data: VehicleFormData) => {
     try {
       setLoading(true);
@@ -121,9 +129,9 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
           proxima_manutencao: data.proxima_manutencao,
           localizacao: data.localizacao,
           combustivel_atual: data.combustivel_atual,
-          motorista_id: data.motorista_id
-            ? Number(data.motorista_id)
-            : null, // ✅ conversão segura
+          motorista_id: data.motorista_id && data.motorista_id !== "none" 
+            ? Number(data.motorista_id) 
+            : null,
         },
       ]);
 
@@ -136,8 +144,12 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
 
       form.reset();
       setOpen(false);
-      onSuccess?.();
+      
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (error) {
+      console.error("Erro ao cadastrar veículo:", error);
       toast({
         title: "Erro",
         description:
@@ -168,7 +180,6 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Campos padrão mantidos */}
               <FormField
                 control={form.control}
                 name="placa"
@@ -255,10 +266,39 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="Ativo">Ativo</SelectItem>
-                        <SelectItem value="Em Manutenção">
-                          Em Manutenção
-                        </SelectItem>
+                        <SelectItem value="Em Manutenção">Em Manutenção</SelectItem>
                         <SelectItem value="Inativo">Inativo</SelectItem>
+                        <SelectItem value="Em uso">Em uso</SelectItem>
+                        <SelectItem value="Disponível">Disponível</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="motorista_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Motorista</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um motorista" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Sem motorista</SelectItem>
+                        {motoristas.map((m) => (
+                          <SelectItem key={m.id} value={String(m.id)}>
+                            {m.nome}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -360,35 +400,6 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
                     <FormControl>
                       <Input placeholder="São Paulo - SP" {...field} />
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* 🔹 Campo motorista_id corrigido */}
-              <FormField
-                control={form.control}
-                name="motorista_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Motorista (opcional)</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value ? String(field.value) : ""}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um motorista" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {motoristas.map((m) => (
-                          <SelectItem key={m.id} value={String(m.id)}>
-                            {m.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -52,7 +52,7 @@ const vehicleSchema = z.object({
     .number()
     .min(0, "Nível de combustível deve ser entre 0 e 100")
     .max(100, "Nível de combustível deve ser entre 0 e 100"),
-  motorista_id: z.union([z.string(), z.number()]).optional().nullable(),
+  motorista_id: z.string().optional(),
 });
 
 type VehicleFormData = z.infer<typeof vehicleSchema>;
@@ -87,30 +87,40 @@ export function VehicleEditDialog({
       proxima_manutencao: "",
       localizacao: "",
       combustivel_atual: 100,
-      motorista_id: null,
+      motorista_id: "none",
     },
   });
 
-  // 🔹 Carrega motoristas com id e nome
   useEffect(() => {
     if (open) {
-      (async () => {
-        const { data, error } = await supabase
-          .from("Motoristas")
-          .select("id, nome")
-          .order("nome", { ascending: true });
-        if (!error && data) {
-          setMotoristas(data);
-        } else if (error) {
-          console.error("Erro ao carregar motoristas:", error.message);
-        }
-      })();
-    }
-  }, [open]);
+      const fetchMotoristas = async () => {
+        try {
+          const { data, error } = await supabase
+            .from("Motoristas")
+            .select("id, nome")
+            .order("nome", { ascending: true });
 
-  // 🔹 Preenche o formulário ao abrir para edição
+          if (error) throw error;
+
+          if (data) {
+            setMotoristas(data);
+          }
+        } catch (err) {
+          console.error("Erro ao carregar motoristas:", err);
+          toast({
+            title: "Aviso",
+            description: "Não foi possível carregar a lista de motoristas",
+            variant: "destructive",
+          });
+        }
+      };
+
+      fetchMotoristas();
+    }
+  }, [open, toast]);
+
   useEffect(() => {
-    if (veiculo) {
+    if (veiculo && open) {
       form.reset({
         placa: veiculo.placa || "",
         marca: veiculo.marca || "",
@@ -122,14 +132,11 @@ export function VehicleEditDialog({
         proxima_manutencao: veiculo.proxima_manutencao || "",
         localizacao: veiculo.localizacao || "",
         combustivel_atual: veiculo.combustivel_atual || 100,
-        motorista_id: veiculo.motorista_id ?? null,
+        motorista_id: veiculo.motorista_id ? String(veiculo.motorista_id) : "none",
       });
-    } else {
-      form.reset();
     }
-  }, [veiculo, form]);
+  }, [veiculo, open, form]);
 
-  // 🔹 Atualiza veículo no Supabase
   const onSubmit = async (data: VehicleFormData) => {
     if (!veiculo) return;
 
@@ -139,20 +146,36 @@ export function VehicleEditDialog({
       const { error } = await supabase
         .from("Veiculos")
         .update({
-          ...data,
-          motorista_id: data.motorista_id
+          placa: data.placa.toUpperCase(),
+          marca: data.marca,
+          modelo: data.modelo,
+          ano: data.ano,
+          status: data.status,
+          quilometragem: data.quilometragem,
+          tipo_combustivel: data.tipo_combustivel,
+          proxima_manutencao: data.proxima_manutencao,
+          localizacao: data.localizacao,
+          combustivel_atual: data.combustivel_atual,
+          motorista_id: data.motorista_id && data.motorista_id !== "none"
             ? Number(data.motorista_id)
             : null,
-          placa: data.placa.toUpperCase(),
         })
-        .eq("placa", veiculo.placa);
+        .eq("id", veiculo.id);
 
       if (error) throw error;
 
-      toast({ title: "Sucesso!", description: "Veículo atualizado com sucesso." });
+      toast({ 
+        title: "Sucesso!", 
+        description: "Veículo atualizado com sucesso." 
+      });
+
       onOpenChange(false);
-      onSuccess?.();
+
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (error) {
+      console.error("Erro ao atualizar veículo:", error);
       toast({
         title: "Erro",
         description:
@@ -242,7 +265,6 @@ export function VehicleEditDialog({
                 )}
               />
 
-              {/* 🔹 Select com id do motorista */}
               <FormField
                 control={form.control}
                 name="motorista_id"
@@ -251,7 +273,7 @@ export function VehicleEditDialog({
                     <FormLabel>Motorista</FormLabel>
                     <Select
                       onValueChange={field.onChange}
-                      value={field.value ? String(field.value) : ""}
+                      value={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -259,6 +281,7 @@ export function VehicleEditDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        <SelectItem value="none">Sem motorista</SelectItem>
                         {motoristas.map((m) => (
                           <SelectItem key={m.id} value={String(m.id)}>
                             {m.nome}
@@ -291,6 +314,98 @@ export function VehicleEditDialog({
                         <SelectItem value="Disponível">Disponível</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="tipo_combustivel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de Combustível</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o combustível" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Gasolina">Gasolina</SelectItem>
+                        <SelectItem value="Etanol">Etanol</SelectItem>
+                        <SelectItem value="Diesel">Diesel</SelectItem>
+                        <SelectItem value="Flex">Flex</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="quilometragem"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quilometragem</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="15000"
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="combustivel_atual"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nível de Combustível (%)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="100"
+                        min="0"
+                        max="100"
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="proxima_manutencao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Próxima Manutenção</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="localizacao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Localização</FormLabel>
+                    <FormControl>
+                      <Input placeholder="São Paulo - SP" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
