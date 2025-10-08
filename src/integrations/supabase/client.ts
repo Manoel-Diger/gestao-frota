@@ -29,9 +29,13 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 export const checkSupabaseConnection = async () => {
   try {
     const { data, error } = await supabase.from('Veiculos').select('count', { count: 'exact', head: true });
-    return !error;
+    if (error) {
+      console.error('Supabase connection error:', error.message);
+      return false;
+    }
+    return true;
   } catch (error) {
-    console.error('Supabase connection error:', error);
+    console.error('Supabase connection error:', error instanceof Error ? error.message : 'Unknown error');
     return false;
   }
 };

@@ -17,7 +17,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -29,44 +28,37 @@ import {
 } from "@/components/ui/form";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Plus } from "lucide-react";
+import { Tables } from "@/integrations/supabase/types";
 
-// ✅ Corrigido o tipo de motorista_id para aceitar number ou string (conversão controlada)
+type Veiculo = Tables<"Veiculos">;
+type Motorista = Tables<"Motoristas">;
+
 const vehicleSchema = z.object({
-  placa: z
-    .string()
-    .min(7, "Placa deve ter pelo menos 7 caracteres")
-    .max(8, "Placa deve ter no máximo 8 caracteres"),
+  placa: z.string().min(7, "Placa deve ter pelo menos 7 caracteres").max(8, "Placa deve ter no máximo 8 caracteres"),
   marca: z.string().min(2, "Marca é obrigatória"),
   modelo: z.string().min(2, "Modelo é obrigatório"),
-  ano: z
-    .number()
-    .min(1990, "Ano deve ser maior que 1990")
-    .max(new Date().getFullYear() + 1, "Ano inválido"),
-  status: z.enum(["Ativo", "Em Manutenção", "Inativo"]),
+  ano: z.number().min(1990, "Ano deve ser maior que 1990").max(new Date().getFullYear() + 1, "Ano inválido"),
+  status: z.enum(["Ativo", "Em Manutenção", "Inativo", "Em uso", "Disponível"]),
   quilometragem: z.number().min(0, "Quilometragem deve ser positiva"),
   tipo_combustivel: z.enum(["Gasolina", "Etanol", "Diesel", "Flex"]),
-  proxima_manutencao: z
-    .string()
-    .min(1, "Data da próxima manutenção é obrigatória"),
+  proxima_manutencao: z.string().min(1, "Data da próxima manutenção é obrigatória"),
   localizacao: z.string().min(2, "Localização é obrigatória"),
-  combustivel_atual: z
-    .number()
-    .min(0, "Nível de combustível deve ser entre 0 e 100")
-    .max(100, "Nível de combustível deve ser entre 0 e 100"),
-  motorista_id: z.union([z.string(), z.number()]).optional().nullable(),
+  combustivel_atual: z.number().min(0, "Nível de combustível deve ser entre 0 e 100").max(100, "Nível de combustível deve ser entre 0 e 100"),
+  motorista_id: z.union([z.string(), z.number(), z.null()]).optional(),
 });
 
 type VehicleFormData = z.infer<typeof vehicleSchema>;
 
-interface VehicleFormProps {
+interface VehicleEditDialogProps {
+  veiculo: Veiculo | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
 }
 
-export function VehicleForm({ onSuccess }: VehicleFormProps) {
-  const [open, setOpen] = useState(false);
+export function VehicleEditDialog({ veiculo, open, onOpenChange, onSuccess }: VehicleEditDialogProps) {
   const [loading, setLoading] = useState(false);
-  const [motoristas, setMotoristas] = useState<{ id: number; nome: string }[]>([]);
+  const [motoristas, setMotoristas] = useState<{ id: string; nome: string }[]>([]);
   const { toast } = useToast();
 
   const form = useForm<VehicleFormData>({
@@ -82,35 +74,47 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
       proxima_manutencao: "",
       localizacao: "",
       combustivel_atual: 100,
-      motorista_id: null,
+      motorista_id: "",
     },
   });
 
-  // 🔹 Busca motoristas com id numérico
   useEffect(() => {
     const fetchMotoristas = async () => {
-      const { data, error } = await supabase
-        .from("Motoristas")
-        .select("id, nome")
-        .order("nome", { ascending: true });
-
+      const { data, error } = await supabase.from("Motoristas").select("id, nome");
       if (!error && data) {
-        setMotoristas(data);
-      } else if (error) {
-        console.error("Erro ao buscar motoristas:", error.message);
+        setMotoristas(data.map((m) => ({ id: String(m.id), nome: m.nome })));
       }
     };
-
     fetchMotoristas();
   }, []);
 
-  // 🔹 Inserção no Supabase com tipos consistentes
+  useEffect(() => {
+    if (veiculo) {
+      form.reset({
+        placa: veiculo.placa || "",
+        marca: veiculo.marca || "",
+        modelo: veiculo.modelo || "",
+        ano: veiculo.ano || new Date().getFullYear(),
+        status: (veiculo.status as any) || "Ativo",
+        quilometragem: veiculo.quilometragem || 0,
+        tipo_combustivel: (veiculo.tipo_combustivel as any) || "Flex",
+        proxima_manutencao: veiculo.proxima_manutencao || "",
+        localizacao: veiculo.localizacao || "",
+        combustivel_atual: veiculo.combustivel_atual || 100,
+        motorista_id: veiculo.motorista_id ? String(veiculo.motorista_id) : "",
+      });
+    }
+  }, [veiculo, form]);
+
   const onSubmit = async (data: VehicleFormData) => {
+    if (!veiculo) return;
+
     try {
       setLoading(true);
 
-      const { error } = await supabase.from("Veiculos").insert([
-        {
+      const { error } = await supabase
+        .from("Veiculos")
+        .update({
           placa: data.placa.toUpperCase(),
           marca: data.marca,
           modelo: data.modelo,
@@ -121,27 +125,23 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
           proxima_manutencao: data.proxima_manutencao,
           localizacao: data.localizacao,
           combustivel_atual: data.combustivel_atual,
-          motorista_id: data.motorista_id
-            ? Number(data.motorista_id)
-            : null, // ✅ conversão segura
-        },
-      ]);
+          motorista_id: data.motorista_id ? Number(data.motorista_id) : null,
+        })
+        .eq("id", veiculo.id);
 
       if (error) throw error;
 
       toast({
         title: "Sucesso!",
-        description: "Veículo cadastrado com sucesso.",
+        description: "Veículo atualizado com sucesso.",
       });
 
-      form.reset();
-      setOpen(false);
+      onOpenChange(false);
       onSuccess?.();
     } catch (error) {
       toast({
         title: "Erro",
-        description:
-          error instanceof Error ? error.message : "Erro ao cadastrar veículo",
+        description: error instanceof Error ? error.message : "Erro ao atualizar veículo",
         variant: "destructive",
       });
     } finally {
@@ -150,25 +150,16 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-gradient-primary hover:bg-primary-hover w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          Adicionar Veículo
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Cadastrar Novo Veículo</DialogTitle>
-          <DialogDescription>
-            Preencha os dados do veículo para adicioná-lo à frota.
-          </DialogDescription>
+          <DialogTitle>Editar Veículo</DialogTitle>
+          <DialogDescription>Atualize os dados do veículo.</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Campos padrão mantidos */}
               <FormField
                 control={form.control}
                 name="placa"
@@ -179,9 +170,7 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
                       <Input
                         placeholder="ABC-1234"
                         {...field}
-                        onChange={(e) =>
-                          field.onChange(e.target.value.toUpperCase())
-                        }
+                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
                       />
                     </FormControl>
                     <FormMessage />
@@ -228,9 +217,7 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
                         type="number"
                         placeholder="2024"
                         {...field}
-                        onChange={(e) =>
-                          field.onChange(Number(e.target.value))
-                        }
+                        onChange={(e) => field.onChange(parseInt(e.target.value))}
                       />
                     </FormControl>
                     <FormMessage />
@@ -244,10 +231,7 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Status</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o status" />
@@ -255,10 +239,40 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="Ativo">Ativo</SelectItem>
-                        <SelectItem value="Em Manutenção">
-                          Em Manutenção
-                        </SelectItem>
+                        <SelectItem value="Em Manutenção">Em Manutenção</SelectItem>
                         <SelectItem value="Inativo">Inativo</SelectItem>
+                        <SelectItem value="Em uso">Em uso</SelectItem>
+                        <SelectItem value="Disponível">Disponível</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Motorista */}
+              <FormField
+                control={form.control}
+                name="motorista_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Motorista</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value ? String(field.value) : ""}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um motorista" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">Sem motorista</SelectItem>
+                        {motoristas.map((motorista) => (
+                          <SelectItem key={motorista.id} value={motorista.id}>
+                            {motorista.nome}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -272,10 +286,7 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tipo de Combustível</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione o combustível" />
@@ -304,9 +315,7 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
                         type="number"
                         placeholder="15000"
                         {...field}
-                        onChange={(e) =>
-                          field.onChange(Number(e.target.value) || 0)
-                        }
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -327,9 +336,7 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
                         min="0"
                         max="100"
                         {...field}
-                        onChange={(e) =>
-                          field.onChange(Number(e.target.value) || 0)
-                        }
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                       />
                     </FormControl>
                     <FormMessage />
@@ -364,49 +371,20 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
                   </FormItem>
                 )}
               />
-
-              {/* 🔹 Campo motorista_id corrigido */}
-              <FormField
-                control={form.control}
-                name="motorista_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Motorista (opcional)</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value ? String(field.value) : ""}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um motorista" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {motoristas.map((m) => (
-                          <SelectItem key={m.id} value={String(m.id)}>
-                            {m.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
 
             <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={() => onOpenChange(false)}
                 disabled={loading}
                 className="w-full sm:w-auto"
               >
                 Cancelar
               </Button>
               <Button type="submit" disabled={loading} className="w-full sm:w-auto">
-                {loading ? "Salvando..." : "Salvar Veículo"}
+                {loading ? "Salvando..." : "Salvar Alterações"}
               </Button>
             </div>
           </form>

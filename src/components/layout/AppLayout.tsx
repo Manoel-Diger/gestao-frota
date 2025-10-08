@@ -14,6 +14,9 @@ export function AppLayout() {
           <main className="flex-1 p-6 bg-gradient-to-br from-background to-secondary/20">
             <Outlet />
           </main>
+          <footer className="text-center text-sm text-muted-foreground py-4 border-t border-border">
+            © 2025 Desenvolvido por Manoel Armenteiro Diger Neto. Todos os direitos reservados.
+          </footer>
         </div>
       </div>
     </SidebarProvider>

@@ -30,29 +30,19 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
+import { TablesUpdate } from "@/integrations/supabase/types";
 
-// 1. IMPORTAÇÃO DO SEU ARQUIVO DE TIPOS (MANTENDO A CORREÇÃO DE TIPAGEM)
-import { TablesUpdate } from "@/integrations/supabase/types"; 
+// --- Tipagem corrigida e alinhada ao banco ---
+type VeiculosUpdatePayload = TablesUpdate<"Veiculos"> & {
+  motorista?: string | null;
+};
 
-// --- TIPAGEM FINAL CORRIGIDA PARA RESOLVER ts(2559) ---
-
-// O tipo TablesUpdate<'Veiculos'> é usado, e adicionamos 'motorista'
-// para contornar o tipo incompleto gerado pelo Supabase.
-type VeiculosUpdatePayload = TablesUpdate<'Veiculos'> & {
-    motorista?: string | null;
-}
-
-// Definir o tipo 'Veiculos' para a consulta
 interface VehiclePlateResult {
-    placa: string;
+  placa: string;
 }
 
-// --- FIM DA CORREÇÃO DE TIPAGEM ---
-
-
-// Definição da interface alinhada com MotoristaData
 interface MotoristaData {
-  id?: number; 
+  id?: number;
   categoria_cnh: "A" | "B" | "C" | "D" | "E" | "AB" | "AC" | "AD" | "AE";
   cnh_numero: string;
   cnh_validade: string;
@@ -61,9 +51,10 @@ interface MotoristaData {
   nome: string;
   status: "Ativo" | "Inativo";
   telefone: string;
-  placa?: string | null; 
+  placa?: string | null;
 }
 
+// --- Schema de validação ---
 const driverSchema = z.object({
   nome: z.string().min(2, "Nome é obrigatório"),
   email: z.string().email("Email inválido"),
@@ -72,7 +63,6 @@ const driverSchema = z.object({
   cnh_numero: z.string().min(5, "Número da CNH é obrigatório"),
   cnh_validade: z.string().min(1, "Data de validade é obrigatória"),
   status: z.enum(["Ativo", "Inativo"]),
-  // Placa: Garante que "" é transformado em null antes de ser enviado para o banco
   placa: z.string().optional().or(z.literal("")).transform(e => e === "" ? null : e),
 });
 
@@ -100,22 +90,22 @@ export function DriverForm({ onSuccess, motorista, isOpen, setIsOpen }: DriverFo
       cnh_numero: motorista?.cnh_numero || "",
       cnh_validade: motorista?.cnh_validade || "",
       status: motorista?.status || "Ativo",
-      placa: motorista?.placa || null, // Garante que o valor inicial é null se não houver placa
+      placa: motorista?.placa || null,
     },
   });
 
+  // 🔹 Carregar placas de veículos disponíveis
   useEffect(() => {
     const fetchVehicles = async () => {
       const { data, error } = await supabase
-        .from('Veiculos')
-        .select('placa') as { data: VehiclePlateResult[] | null, error: any };
+        .from("Veiculos")
+        .select("placa") as { data: VehiclePlateResult[] | null; error: any };
 
       if (error) {
-        console.error("Error fetching vehicles:", error);
+        console.error("Erro ao buscar veículos:", error);
       } else if (data) {
-        const plates = data.map(v => v.placa);
-        // Filtra nulls para garantir que apenas placas válidas estejam na lista
-        setAvailableVehicles(plates.filter((p): p is string => p !== null)); 
+        const plates = data.map((v) => v.placa);
+        setAvailableVehicles(plates.filter((p): p is string => p !== null));
       }
     };
     fetchVehicles();
@@ -124,29 +114,24 @@ export function DriverForm({ onSuccess, motorista, isOpen, setIsOpen }: DriverFo
   const onSubmit = async (formData: DriverFormData) => {
     try {
       setLoading(true);
-
       const novaPlaca = formData.placa;
+      const oldPlaca = motorista?.placa || null;
 
-      // Validação da Nova Placa: Se uma placa foi fornecida (não null), ela deve ser válida.
+      // 🔸 Validação: a placa deve existir no cadastro de veículos
       if (novaPlaca && !availableVehicles.includes(novaPlaca)) {
         toast({
           title: "Erro de Validação",
-          description: "A placa inserida não existe no cadastro de veículos ou está incorreta.",
+          description: "A placa informada não existe no cadastro de veículos.",
           variant: "destructive",
         });
         setLoading(false);
         return;
       }
 
-      // Garante que oldPlaca seja null se não estiver definida, para evitar bugs lógicos.
-      const oldPlaca = motorista?.placa || null; 
-
       if (motorista?.id) {
         // --- MODO EDIÇÃO ---
-        
-        // 1. Atualiza Motoristas
         const { error: motorError } = await supabase
-          .from('Motoristas')
+          .from("Motoristas")
           .update({
             nome: formData.nome,
             email: formData.email,
@@ -155,57 +140,38 @@ export function DriverForm({ onSuccess, motorista, isOpen, setIsOpen }: DriverFo
             cnh_numero: formData.cnh_numero,
             cnh_validade: formData.cnh_validade,
             status: formData.status,
-            placa: novaPlaca, // Pode ser uma string ou null
+            placa: novaPlaca,
           })
-          .eq('id', motorista.id);
+          .eq("id", motorista.id);
 
         if (motorError) {
-          // *** REFORÇO DE LOG PARA CAPTURAR FALHAS SILENCIOSAS (RLS/Permissões) ***
-          console.error("ERRO CRÍTICO: Falha na atualização do Motorista:", motorError);
-          // ********************************************************************
-
-          if (motorError.code === '23505') {
-            toast({
-              title: "Erro de Cadastro",
-              description: "Esta placa já está associada a outro motorista (verifique restrições UNIQUE).",
-              variant: "destructive",
-            });
-          } else {
-            // Em caso de erro, lança a mensagem completa para o toast
-            throw new Error(`Erro no banco de dados: ${motorError.message}`);
-          }
-          setLoading(false);
-          return;
+          throw new Error(`Erro ao atualizar motorista: ${motorError.message}`);
         }
 
-        // 2. SINCRONIZAÇÃO DA TABELA VEICULOS (LÓGICA CORRIGIDA)
-        
-        // A) DESASSOCIAÇÃO: Se existia uma placa antiga E ela é diferente da nova
+        // --- SINCRONIZAÇÃO COM VEÍCULOS ---
+
+        // A) Desassocia veículo antigo, se necessário
         if (oldPlaca && oldPlaca !== novaPlaca) {
-            // Desassocia a placa antiga (motorista = null)
-            const { error: desassociarError } = await supabase
-              .from('Veiculos')
-              .update({ motorista: null } as VeiculosUpdatePayload) 
-              .eq('placa', oldPlaca);
+          const { error: desassocError } = await supabase
+            .from("Veiculos")
+            .update({ motorista: null } as VeiculosUpdatePayload)
+            .eq("placa", oldPlaca);
 
-            if (desassociarError) {
-              console.error("Erro ao desassociar placa antiga:", desassociarError);
-              // Não lança erro fatal, pois o motorista principal já foi atualizado
-            }
+          if (desassocError) {
+            console.error("Erro ao desassociar veículo antigo:", desassocError);
+          }
         }
 
-        // B) ASSOCIAÇÃO: Se existe uma nova placa E ela é diferente da antiga
-        if (novaPlaca && novaPlaca !== oldPlaca) {
-            // Associa a nova placa (motorista = nome)
-            const { error: associarError } = await supabase
-              .from('Veiculos')
-              .update({ motorista: formData.nome } as VeiculosUpdatePayload)
-              .eq('placa', novaPlaca);
+        // B) Associa novo veículo, se necessário
+        if (novaPlaca) {
+          const { error: assocError } = await supabase
+            .from("Veiculos")
+            .update({ motorista: formData.nome } as VeiculosUpdatePayload)
+            .eq("placa", novaPlaca);
 
-            if (associarError) {
-              console.error("Erro ao associar nova placa:", associarError);
-              throw new Error(`Erro ao sincronizar veículo: ${associarError.message}`);
-            }
+          if (assocError) {
+            throw new Error(`Erro ao associar veículo: ${assocError.message}`);
+          }
         }
 
         toast({
@@ -215,47 +181,32 @@ export function DriverForm({ onSuccess, motorista, isOpen, setIsOpen }: DriverFo
 
       } else {
         // --- MODO CRIAÇÃO ---
-
-        // 1. Insere em Motoristas
-        const { error: motorError } = await supabase
-          .from('Motoristas')
-          .insert([
-            {
-              nome: formData.nome,
-              email: formData.email,
-              telefone: formData.telefone,
-              categoria_cnh: formData.categoria_cnh,
-              cnh_numero: formData.cnh_numero,
-              cnh_validade: formData.cnh_validade,
-              status: formData.status,
-              placa: novaPlaca,
-            }
-          ]);
+        const { error: motorError } = await supabase.from("Motoristas").insert([
+          {
+            nome: formData.nome,
+            email: formData.email,
+            telefone: formData.telefone,
+            categoria_cnh: formData.categoria_cnh,
+            cnh_numero: formData.cnh_numero,
+            cnh_validade: formData.cnh_validade,
+            status: formData.status,
+            placa: novaPlaca,
+          },
+        ]);
 
         if (motorError) {
-          // Em caso de erro, lança a mensagem completa para o toast
-          if (motorError.code === '23505') {
-            toast({
-              title: "Erro de Cadastro",
-              description: "Esta placa já está associada a outro motorista (verifique restrições UNIQUE).",
-              variant: "destructive",
-            });
-          } else {
-            throw new Error(`Erro no banco de dados: ${motorError.message}`);
-          }
-          setLoading(false);
-          return;
+          throw new Error(`Erro ao cadastrar motorista: ${motorError.message}`);
         }
 
-        // 2. Sincroniza Veiculos para nova associação (se houver placa)
+        // Se houver placa, associa o veículo ao novo motorista
         if (novaPlaca) {
-          const { error: veiculoError } = await supabase
-            .from('Veiculos')
+          const { error: assocError } = await supabase
+            .from("Veiculos")
             .update({ motorista: formData.nome } as VeiculosUpdatePayload)
-            .eq('placa', novaPlaca);
+            .eq("placa", novaPlaca);
 
-          if (veiculoError) {
-            throw new Error(`Erro ao sincronizar veículo: ${veiculoError.message}`);
+          if (assocError) {
+            throw new Error(`Erro ao sincronizar veículo: ${assocError.message}`);
           }
         }
 
@@ -268,6 +219,7 @@ export function DriverForm({ onSuccess, motorista, isOpen, setIsOpen }: DriverFo
       form.reset();
       setIsOpen(false);
       onSuccess?.();
+
     } catch (error) {
       toast({
         title: "Erro Fatal na Transação",
@@ -291,10 +243,12 @@ export function DriverForm({ onSuccess, motorista, isOpen, setIsOpen }: DriverFo
         <DialogHeader>
           <DialogTitle>{motorista ? "Editar Motorista" : "Cadastrar Novo Motorista"}</DialogTitle>
           <DialogDescription>
-            {motorista ? "Atualize os dados do motorista." : "Preencha os dados do motorista para adicioná-lo à equipe."}
+            {motorista
+              ? "Atualize os dados do motorista."
+              : "Preencha os dados para adicionar um novo motorista."}
           </DialogDescription>
         </DialogHeader>
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -363,15 +317,11 @@ export function DriverForm({ onSuccess, motorista, isOpen, setIsOpen }: DriverFo
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="A">A - Motocicletas</SelectItem>
-                        <SelectItem value="B">B - Automóveis</SelectItem>
-                        <SelectItem value="C">C - Caminhões leves</SelectItem>
-                        <SelectItem value="D">D - Transporte coletivo</SelectItem>
-                        <SelectItem value="E">E - Caminhões pesados</SelectItem>
-                        <SelectItem value="AB">AB - A + B</SelectItem>
-                        <SelectItem value="AC">AC - A + C</SelectItem>
-                        <SelectItem value="AD">AD - A + D</SelectItem>
-                        <SelectItem value="AE">AE - A + E</SelectItem>
+                        {["A", "B", "C", "D", "E", "AB", "AC", "AD", "AE"].map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -426,10 +376,11 @@ export function DriverForm({ onSuccess, motorista, isOpen, setIsOpen }: DriverFo
                 )}
               />
             </div>
+
             <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={() => setIsOpen(false)}
                 disabled={loading}
                 className="w-full sm:w-auto"

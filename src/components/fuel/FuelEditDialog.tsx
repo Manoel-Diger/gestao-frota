@@ -2,17 +2,37 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Tables } from "@/integrations/supabase/types";
 import { Loader2 } from "lucide-react";
+import { useAbastecimentos } from "@/hooks/useAbastecimentos";
 
-type Abastecimento = Tables<'Abastecimentos'>;
+type Abastecimento = Tables<"Abastecimentos">;
 
 const fuelEditSchema = z.object({
   veiculo_placa: z.string().min(1, "Selecione um veículo"),
@@ -31,10 +51,16 @@ interface FuelEditDialogProps {
   onSuccess: () => void;
 }
 
-export function FuelEditDialog({ abastecimento, open, onOpenChange, onSuccess }: FuelEditDialogProps) {
+export function FuelEditDialog({
+  abastecimento,
+  open,
+  onOpenChange,
+  onSuccess,
+}: FuelEditDialogProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [vehicles, setVehicles] = useState<any[]>([]);
+  const { updateAbastecimento } = useAbastecimentos();
 
   const form = useForm<FuelEditFormData>({
     resolver: zodResolver(fuelEditSchema),
@@ -49,8 +75,8 @@ export function FuelEditDialog({ abastecimento, open, onOpenChange, onSuccess }:
 
   useEffect(() => {
     const fetchVehicles = async () => {
-      const { data } = await supabase.from("Veiculos").select("placa");
-      setVehicles(data || []);
+      const { data, error } = await supabase.from("Veiculos").select("placa");
+      if (!error) setVehicles(data || []);
     };
 
     if (open) {
@@ -69,21 +95,18 @@ export function FuelEditDialog({ abastecimento, open, onOpenChange, onSuccess }:
 
   const onSubmit = async (values: FuelEditFormData) => {
     if (!abastecimento) return;
-
     setLoading(true);
-    try {
-      const { error } = await supabase
-        .from("Abastecimentos")
-        .update({
-          veiculo_placa: values.veiculo_placa,
-          data: values.data,
-          litros: parseFloat(values.litros),
-          quilometragem: parseInt(values.quilometragem),
-          custo_total: parseFloat(values.custo_total),
-        })
-        .eq("id", abastecimento.id);
 
-      if (error) throw error;
+    try {
+      const result = await updateAbastecimento(abastecimento.id, {
+        veiculo_placa: values.veiculo_placa,
+        data: values.data,
+        litros: parseFloat(values.litros),
+        quilometragem: parseInt(values.quilometragem),
+        custo_total: parseFloat(values.custo_total),
+      });
+
+      if (!result) throw new Error("Falha ao atualizar abastecimento.");
 
       toast({
         title: "Sucesso!",
@@ -91,7 +114,7 @@ export function FuelEditDialog({ abastecimento, open, onOpenChange, onSuccess }:
       });
 
       onOpenChange(false);
-      onSuccess();
+      onSuccess(); // Atualiza o dashboard se necessário
     } catch (error) {
       console.error("Erro ao atualizar abastecimento:", error);
       toast({
@@ -111,7 +134,11 @@ export function FuelEditDialog({ abastecimento, open, onOpenChange, onSuccess }:
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Editar Abastecimento</DialogTitle>
+          <DialogDescription>
+            Atualize os dados do abastecimento selecionado.
+          </DialogDescription>
         </DialogHeader>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -161,7 +188,12 @@ export function FuelEditDialog({ abastecimento, open, onOpenChange, onSuccess }:
                   <FormItem>
                     <FormLabel>Litros</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -190,7 +222,12 @@ export function FuelEditDialog({ abastecimento, open, onOpenChange, onSuccess }:
                 <FormItem>
                   <FormLabel>Custo Total (R$)</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -198,11 +235,20 @@ export function FuelEditDialog({ abastecimento, open, onOpenChange, onSuccess }:
             />
 
             <div className="flex gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                className="flex-1"
+              >
                 Cancelar
               </Button>
               <Button type="submit" disabled={loading} className="flex-1">
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar Alterações"}
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  "Salvar Alterações"
+                )}
               </Button>
             </div>
           </form>
