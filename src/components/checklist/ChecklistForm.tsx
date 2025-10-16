@@ -1,554 +1,606 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { FileCheck, Save, AlertTriangle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { TablesInsert, ChecklistSecoesType } from "@/integrations/supabase/types";
-import { useMotoristas } from "@/hooks/useMotoristas";
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { ImageUpload } from './ImageUpload';
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { useChecklists } from '@/hooks/useChecklists';
 
 const itemSchema = z.object({
-    descricao: z.string(),
-    conforme: z.boolean(),
-    observacoes: z.string().optional(),
+  conforme: z.enum(['conforme', 'nao_conforme']),
+  observacoes: z.string().optional(),
 });
 
-const secaoSchema = z.object({
-    titulo: z.string(),
-    itens: z.array(itemSchema),
+const formSchema = z.object({
+  data_inspecao: z.string().min(1, 'Data é obrigatória'),
+  placa_veiculo: z.string().min(1, 'Placa do veículo é obrigatória'),
+  placa_implemento: z.string().optional(),
+  motorista: z.coerce.number().min(1, 'Motorista é obrigatório'),
+  tipo_checklist: z.string().min(1, 'Tipo é obrigatório'),
+  status_final: z.string().min(1, 'Status é obrigatório'),
+  local_inspecao: z.string().min(1, 'Local é obrigatório'),
+  odometro: z.coerce.number().min(0, 'Odômetro deve ser maior que 0'),
+  assinatura_motorista: z.string().optional(),
+  visto_lideranca: z.string().optional(),
+  secao1: z.object({
+    item_1_1: itemSchema,
+    item_1_2: itemSchema,
+    item_1_3: itemSchema,
+    item_1_4: itemSchema,
+    item_1_5: itemSchema,
+    item_1_6: itemSchema,
+  }),
+  secao2: z.object({
+    item_2_1: itemSchema.extend({ psi: z.string().optional() }),
+    item_2_2: itemSchema.extend({ especificacao: z.string().optional() }),
+    item_2_3: itemSchema,
+    item_2_4: itemSchema,
+    item_2_5: itemSchema,
+    item_2_6: itemSchema,
+    item_2_7: itemSchema,
+  }),
+  secao3: z.object({
+    item_3_1: itemSchema,
+    item_3_2: itemSchema,
+    item_3_3: itemSchema,
+    item_3_4: itemSchema,
+    item_3_5: itemSchema,
+    item_3_6: itemSchema,
+  }),
+  secao4: z.object({
+    item_4_1: itemSchema,
+    item_4_2: itemSchema,
+    item_4_3: itemSchema,
+    item_4_4: itemSchema,
+    item_4_5: itemSchema,
+    item_4_6: itemSchema,
+    item_4_7: itemSchema.extend({ luz_acesa: z.string().optional() }),
+  }),
+  secao5: z.object({
+    item_5_1: itemSchema,
+    item_5_2: itemSchema,
+    item_5_3: itemSchema,
+    item_5_4: itemSchema,
+    item_5_5: itemSchema,
+    item_5_6: itemSchema,
+    item_5_7: itemSchema,
+    item_5_8: itemSchema,
+    item_5_9: itemSchema,
+  }),
+  secao6: z.object({
+    item_6_1: itemSchema,
+    item_6_2: itemSchema,
+    item_6_3: itemSchema,
+    item_6_4: itemSchema,
+    item_6_5: itemSchema,
+    item_6_6: itemSchema,
+    item_6_7: itemSchema.extend({ numero_lacre: z.string().optional() }),
+  }),
 });
 
-const checklistSchema = z.object({
-    motorista: z.number().min(1, "O ID do Motorista é obrigatório e deve ser um número válido"),
-    placa_veiculo: z.string().min(1, "Placa do veículo é obrigatória"),
-    placa_implemento: z.string().optional(),
-    odometro: z.number().min(0, "Odômetro deve ser maior ou igual a zero"),
-    local_inspecao: z.string().min(1, "Local da inspeção é obrigatório"),
-    tipo_checklist: z.string().min(1, "Tipo de checklist é obrigatório"),
-    secoes: z.record(z.string(), secaoSchema),
-    assinatura_motorista: z.boolean().refine(val => val === true, {
-        message: "A assinatura do motorista é obrigatória.",
-    }),
-    visto_lideranca: z.boolean().optional(),
-    data_inspecao: z.string(),
-});
-
-type ChecklistFormData = z.infer<typeof checklistSchema>;
+type FormValues = z.infer<typeof formSchema>;
 
 interface ChecklistFormProps {
-    onSuccess: () => void;
+  onSubmit: (values: any) => void;
+  initialData?: any;
+  isLoading?: boolean;
 }
 
-const secoesTemplate: Record<string, z.infer<typeof secaoSchema>> = {
-    documentacao: {
-        titulo: "Documentação e Obrigatoriedade Legal",
-        itens: [
-            { descricao: "CNH do Motorista (Válida e na Categoria Correta)", conforme: false, observacoes: "" },
-            { descricao: "CRLV (Licenciamento) (Veículo e Implemento, válidos)", conforme: false, observacoes: "" },
-            { descricao: "Exame Toxicológico (Se aplicável à categoria)", conforme: false, observacoes: "" },
-            { descricao: "Extintor de Incêndio (Cheio, Válido e Acessível)", conforme: false, observacoes: "" },
-            { descricao: "Triângulo de Sinalização (Completo e íntegro)", conforme: false, observacoes: "" },
-            { descricao: "Macaco e Chave de Roda (Em condições de uso)", conforme: false, observacoes: "" },
-        ],
-    },
-    freios_rodagem: {
-        titulo: "Sistema de Freios e Rodagem",
-        itens: [
-            { descricao: "Pressão dos Pneus (Conforme manual de carga)", conforme: false, observacoes: "" },
-            { descricao: "Profundidade dos Sulcos (TWI) (Acima do limite legal)", conforme: false, observacoes: "" },
-            { descricao: "Estado Visual dos Pneus (Sem bolhas, cortes ou avarias laterais)", conforme: false, observacoes: "" },
-            { descricao: "Rodas e Fixação (Sem folgas, porcas apertadas e íntegras)", conforme: false, observacoes: "" },
-            { descricao: "Freio de Serviço (Pedal) (Acionamento firme, sem 'borracha')", conforme: false, observacoes: "" },
-            { descricao: "Freio de Estacionamento (Travamento eficiente)", conforme: false, observacoes: "" },
-            { descricao: "Nível de Fluido de Freio (Dentro da marcação MIN/MAX)", conforme: false, observacoes: "" },
-        ],
-    },
-    fluidos_motor: {
-        titulo: "Níveis de Fluidos e Motor",
-        itens: [
-            { descricao: "Nível de Óleo do Motor (Entre as marcas de verificação)", conforme: false, observacoes: "" },
-            { descricao: "Nível de Água do Radiador (Líquido de arrefecimento)", conforme: false, observacoes: "" },
-            { descricao: "Nível de Arla 32 (Se veículo for Diesel Euro V/VI)", conforme: false, observacoes: "" },
-            { descricao: "Vazamentos Aparentes (Motor, transmissão, eixos)", conforme: false, observacoes: "" },
-            { descricao: "Mangueiras e Correias (Sem rachaduras, bom tensionamento)", conforme: false, observacoes: "" },
-            { descricao: "Funcionamento do Motor (Marcha lenta estável, sem ruídos estranhos)", conforme: false, observacoes: "" },
-        ],
-    },
-    iluminacao: {
-        titulo: "Iluminação, Sinalização e Elétrica",
-        itens: [
-            { descricao: "Faróis (Alto e Baixo)", conforme: false, observacoes: "" },
-            { descricao: "Lanternas Dianteiras e Traseiras", conforme: false, observacoes: "" },
-            { descricao: "Luzes de Freio (Incluindo 3ª Luz de Freio)", conforme: false, observacoes: "" },
-            { descricao: "Luzes Indicadoras de Direção (Setas)", conforme: false, observacoes: "" },
-            { descricao: "Pisca-Alerta (Funcionamento simultâneo)", conforme: false, observacoes: "" },
-            { descricao: "Buzina e Limpador de Para-brisa", conforme: false, observacoes: "" },
-            { descricao: "Painel de Instrumentos (Sem luzes de alerta acesas)", conforme: false, observacoes: "" },
-        ],
-    },
-    cabine: {
-        titulo: "Cabine e Condições Gerais",
-        itens: [
-            { descricao: "Para-brisa e Vidros (Sem trincas ou avarias que obstruam a visão)", conforme: false, observacoes: "" },
-            { descricao: "Espelhos Retrovisores (Limpos, fixos e sem quebras)", conforme: false, observacoes: "" },
-            { descricao: "Condição do Assento e Cinto (Ajustáveis e funcionais)", conforme: false, observacoes: "" },
-            { descricao: "Nível de Combustível (Recomendado: acima de 1/4 do tanque)", conforme: false, observacoes: "" },
-            { descricao: "Limpeza e Organização da Cabine (Sem lixo ou objetos soltos)", conforme: false, observacoes: "" },
-            { descricao: "Tapetes e Forrações (Limpos e sem danos significativos)", conforme: false, observacoes: "" },
-            { descricao: "Maçanetas Externas e Internas (Funcionamento suave e sem quebras)", conforme: false, observacoes: "" },
-            { descricao: "Pintura Danificada (Cabine) (Pontos de ferrugem, riscos profundos)", conforme: false, observacoes: "" },
-            { descricao: "Lataria Danificada (Cabine) (Amassados, partes soltas ou desalinhadas)", conforme: false, observacoes: "" },
-        ],
-    },
-    implemento: {
-        titulo: "Implemento e Segurança da Carga",
-        itens: [
-            { descricao: "Estado Geral do Implemento (Estrutura e Chassi sem trincas ou deformações)", conforme: false, observacoes: "" },
-            { descricao: "Pintura Danificada (Implemento) (Rachaduras ou perda de pintura que exponham o material)", conforme: false, observacoes: "" },
-            { descricao: "Lataria Danificada (Implemento) (Amassados profundos ou painéis soltos)", conforme: false, observacoes: "" },
-            { descricao: "Portas/Tampas e Travamento (Vedação e fechaduras eficientes e seguras)", conforme: false, observacoes: "" },
-            { descricao: "Piso do Compartimento de Carga (Limpo, seco e sem avarias estruturais)", conforme: false, observacoes: "" },
-            { descricao: "Dispositivos de Amarração (Cintas, catracas ou pontos de fixação íntegros)", conforme: false, observacoes: "" },
-            { descricao: "Lacre/Segurança da Carga (Verificar integridade/número do lacre, se aplicável)", conforme: false, observacoes: "" },
-        ],
-    },
-};
+export function ChecklistForm({ onSubmit, initialData, isLoading }: ChecklistFormProps) {
+  const [images, setImages] = useState<string[]>(initialData?.imagens || []);
+  const [totalNaoConformidades, setTotalNaoConformidades] = useState(0);
+  const { motoristas } = useChecklists();
 
-export default function ChecklistForm({ onSuccess }: ChecklistFormProps) {
-    const [loading, setLoading] = useState(false);
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      data_inspecao: initialData?.data_inspecao || new Date().toISOString().split('T')[0],
+      placa_veiculo: initialData?.placa_veiculo || '',
+      placa_implemento: initialData?.placa_implemento || '',
+      motorista: initialData?.motorista || 0,
+      tipo_checklist: initialData?.tipo_checklist || '',
+      status_final: initialData?.status_final || '',
+      local_inspecao: initialData?.local_inspecao || '',
+      odometro: initialData?.odometro || 0,
+      assinatura_motorista: initialData?.assinatura_motorista || '',
+      visto_lideranca: initialData?.visto_lideranca || '',
+      secao1: initialData?.secoes?.secao1 || {
+        item_1_1: { conforme: 'conforme', observacoes: '' },
+        item_1_2: { conforme: 'conforme', observacoes: '' },
+        item_1_3: { conforme: 'conforme', observacoes: '' },
+        item_1_4: { conforme: 'conforme', observacoes: '' },
+        item_1_5: { conforme: 'conforme', observacoes: '' },
+        item_1_6: { conforme: 'conforme', observacoes: '' },
+      },
+      secao2: initialData?.secoes?.secao2 || {
+        item_2_1: { conforme: 'conforme', observacoes: '', psi: '' },
+        item_2_2: { conforme: 'conforme', observacoes: '', especificacao: '' },
+        item_2_3: { conforme: 'conforme', observacoes: '' },
+        item_2_4: { conforme: 'conforme', observacoes: '' },
+        item_2_5: { conforme: 'conforme', observacoes: '' },
+        item_2_6: { conforme: 'conforme', observacoes: '' },
+        item_2_7: { conforme: 'conforme', observacoes: '' },
+      },
+      secao3: initialData?.secoes?.secao3 || {
+        item_3_1: { conforme: 'conforme', observacoes: '' },
+        item_3_2: { conforme: 'conforme', observacoes: '' },
+        item_3_3: { conforme: 'conforme', observacoes: '' },
+        item_3_4: { conforme: 'conforme', observacoes: '' },
+        item_3_5: { conforme: 'conforme', observacoes: '' },
+        item_3_6: { conforme: 'conforme', observacoes: '' },
+      },
+      secao4: initialData?.secoes?.secao4 || {
+        item_4_1: { conforme: 'conforme', observacoes: '' },
+        item_4_2: { conforme: 'conforme', observacoes: '' },
+        item_4_3: { conforme: 'conforme', observacoes: '' },
+        item_4_4: { conforme: 'conforme', observacoes: '' },
+        item_4_5: { conforme: 'conforme', observacoes: '' },
+        item_4_6: { conforme: 'conforme', observacoes: '' },
+        item_4_7: { conforme: 'conforme', observacoes: '', luz_acesa: '' },
+      },
+      secao5: initialData?.secoes?.secao5 || {
+        item_5_1: { conforme: 'conforme', observacoes: '' },
+        item_5_2: { conforme: 'conforme', observacoes: '' },
+        item_5_3: { conforme: 'conforme', observacoes: '' },
+        item_5_4: { conforme: 'conforme', observacoes: '' },
+        item_5_5: { conforme: 'conforme', observacoes: '' },
+        item_5_6: { conforme: 'conforme', observacoes: '' },
+        item_5_7: { conforme: 'conforme', observacoes: '' },
+        item_5_8: { conforme: 'conforme', observacoes: '' },
+        item_5_9: { conforme: 'conforme', observacoes: '' },
+      },
+      secao6: initialData?.secoes?.secao6 || {
+        item_6_1: { conforme: 'conforme', observacoes: '' },
+        item_6_2: { conforme: 'conforme', observacoes: '' },
+        item_6_3: { conforme: 'conforme', observacoes: '' },
+        item_6_4: { conforme: 'conforme', observacoes: '' },
+        item_6_5: { conforme: 'conforme', observacoes: '' },
+        item_6_6: { conforme: 'conforme', observacoes: '' },
+        item_6_7: { conforme: 'conforme', observacoes: '', numero_lacre: '' },
+      },
+    },
+  });
 
-    const { motoristas, loading: loadingMotoristas, error: errorMotoristas } = useMotoristas();
-
-    const form = useForm<ChecklistFormData>({
-        resolver: zodResolver(checklistSchema),
-        defaultValues: {
-            motorista: 0,
-            placa_veiculo: "",
-            placa_implemento: "",
-            odometro: 0,
-            local_inspecao: "",
-            tipo_checklist: "",
-            secoes: secoesTemplate,
-            assinatura_motorista: false,
-            visto_lideranca: false,
-            data_inspecao: new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }).replace(',', ''),
-        },
-    });
-
-    const onSubmit = async (data: ChecklistFormData) => {
-        setLoading(true);
-        try {
-            const totalNaoConformidades = Object.values(data.secoes).reduce(
-                (total, secao) => total + secao.itens.filter(item => !item.conforme).length,
-                0
-            );
-
-            const statusFinal = totalNaoConformidades === 0 ? "APROVADO" : "REPROVADO";
-
-            if (statusFinal === "REPROVADO" && !data.visto_lideranca) {
-                alert("Atenção: Para checklist REPROVADO, o Visto da Liderança/Frota é obrigatório.");
-                setLoading(false);
-                return;
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      let count = 0;
+      Object.keys(value).forEach((key) => {
+        if (key.startsWith('secao')) {
+          const secao = value[key as keyof typeof value] as any;
+          Object.keys(secao || {}).forEach((itemKey) => {
+            if (secao[itemKey]?.conforme === 'nao_conforme') {
+              count++;
             }
-
-            // CORREÇÃO DE DATA: Tenta analisar a data em formato pt-BR e converte para ISO
-            let dataInspecaoISO: string;
-            try {
-                const parts = data.data_inspecao.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})/);
-                let dataObj: Date;
-
-                if (parts) {
-                    // Monta a string no formato YYYY-MM-DDTHH:mm:ss para ser interpretada corretamente
-                    dataObj = new Date(`${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:${parts[6]}`);
-                } else {
-                    // Tenta criar a data a partir da string original (pode funcionar em alguns ambientes)
-                    dataObj = new Date(data.data_inspecao);
-                }
-
-                if (isNaN(dataObj.getTime())) {
-                    throw new Error("Data inválida");
-                }
-
-                if (dataObj.getFullYear() < 2020 || dataObj.getFullYear() > 2050) {
-                    console.warn("Data fora do range esperado. Usando ISO string local.");
-                }
-
-                dataInspecaoISO = dataObj.toISOString();
-
-            } catch (dateError) {
-                console.error("Erro ao processar data_inspecao. O erro 'Aviso: Data de inspeção inválida' vinha daqui:", dateError);
-                dataInspecaoISO = new Date().toISOString();
-                alert("Aviso: Data de inspeção inválida. Usando data/hora atual.");
-            }
-
-            // Preparação do Payload
-            const checklistData: TablesInsert<'checklists'> = {
-                motorista: String(data.motorista), // mantém ID numérico convertido para string
-                data_inspecao: dataInspecaoISO,
-                placa_veiculo: data.placa_veiculo.toUpperCase(),
-                placa_implemento: data.placa_implemento ? data.placa_implemento.toUpperCase() : null,
-                odometro: data.odometro,
-                local_inspecao: data.local_inspecao,
-                tipo_checklist: data.tipo_checklist,
-                secoes: Object.values(data.secoes) as unknown as ChecklistSecoesType,
-                total_nao_conformidades: totalNaoConformidades,
-                status_final: statusFinal,
-                assinatura_motorista: data.assinatura_motorista,
-                visto_lideranca: data.visto_lideranca || false,
-            };
-
-            const { error } = await supabase.from('checklists').insert([checklistData]);
-
-            if (error) {
-                console.error("Erro detalhado do Supabase:", error);
-                if (error.code === '23503' && error.message.includes('fk_checklists_motorista')) {
-                    alert(`Erro de Chave Estrangeira: O ID do Motorista ${data.motorista} não está cadastrado.`);
-                } else if (error.code === '23503' && error.message.includes('fk_checklists_veiculo')) {
-                    alert("Erro de Chave Estrangeira: A placa do veículo não está cadastrada.");
-                } else {
-                    alert(`Erro ao criar checklist: ${error.message}`);
-                }
-                return;
-            }
-
-            alert("Checklist criado com sucesso!");
-            onSuccess();
-        } catch (error) {
-            console.error("Erro inesperado durante o envio:", error);
-            alert("Erro inesperado. Tente novamente.");
-        } finally {
-            setLoading(false);
+          });
         }
+      });
+      setTotalNaoConformidades(count);
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
+
+  const handleSubmit = (values: FormValues) => {
+    const secoes = {
+      secao1: values.secao1,
+      secao2: values.secao2,
+      secao3: values.secao3,
+      secao4: values.secao4,
+      secao5: values.secao5,
+      secao6: values.secao6,
     };
+    onSubmit({
+      data_inspecao: values.data_inspecao,
+      placa_veiculo: values.placa_veiculo,
+      placa_implemento: values.placa_implemento,
+      motorista: values.motorista,
+      tipo_checklist: values.tipo_checklist,
+      status_final: values.status_final,
+      local_inspecao: values.local_inspecao,
+      odometro: values.odometro,
+      total_nao_conformidades: totalNaoConformidades,
+      assinatura_motorista: values.assinatura_motorista || null,
+      visto_lideranca: values.visto_lideranca || null,
+      secoes: secoes,
+      imagens: images,
+    });
+  };
 
-    const updateItemField = (secaoKey: keyof typeof secoesTemplate, itemIndex: number, fieldName: 'conforme' | 'observacoes', value: any) => {
-        form.setValue(`secoes.${secaoKey}.itens.${itemIndex}.${fieldName}`, value as any, { shouldDirty: true, shouldValidate: true });
-        form.trigger("secoes");
-    };
-
-    const calculateNaoConformidades = () => {
-        const secoes = form.watch("secoes");
-        return Object.values(secoes).reduce(
-            (total, secao) => total + secao.itens.filter(item => !item.conforme).length,
-            0
-        );
-    };
-
-    const totalNaoConformidades = calculateNaoConformidades();
-
-    return (
-        <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                {/* Informações Básicas */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center">
-                            <FileCheck className="mr-2 h-5 w-5" />
-                            Informações Básicas
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-                        {/* Substituição apenas do campo Motorista */}
-                        <FormField
-                            control={form.control}
-                            name="motorista"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Motorista *</FormLabel>
-                                    <FormControl>
-                                        <Select
-                                            onValueChange={(value) => field.onChange(Number(value))}
-                                            value={field.value.toString()}
-                                            disabled={loadingMotoristas || !!errorMotoristas}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder={loadingMotoristas ? "Carregando motoristas..." : "Selecione o motorista"} />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {motoristas.map((motorista) => (
-                                                    <SelectItem key={motorista.id} value={motorista.id.toString()}>
-                                                        {motorista.nome}
-                                                    </SelectItem>
-                                                ))}
-                                                {motoristas.length === 0 && !loadingMotoristas && (
-                                                    <SelectItem value="0" disabled>
-                                                        Nenhum motorista encontrado
-                                                    </SelectItem>
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                    </FormControl>
-                                    <FormMessage />
-                                    {errorMotoristas && <p className="text-red-600 mt-1 text-sm">Erro ao carregar motoristas: {errorMotoristas}</p>}
-                                </FormItem>
-                            )}
-                        />
-
-                        {/* Os demais campos iguais ao seu código original */}
-                        <FormField
-                            control={form.control}
-                            name="placa_veiculo"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Placa do Veículo *</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="XXX-0000" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="placa_implemento"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Placa do Implemento</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="XXX-0000" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="odometro"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Odômetro (km) *</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            type="number"
-                                            placeholder="0"
-                                            {...field}
-                                            onChange={(e) => field.onChange(Number(e.target.value))}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="local_inspecao"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Local da Inspeção *</FormLabel>
-                                    <FormControl>
-                                        <Input placeholder="Ex: Pátio Matriz, Filial X" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="tipo_checklist"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Tipo de Checklist *</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                        <FormControl>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Selecione o tipo" />
-                                            </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                            <SelectItem value="Pré-viagem">Pré-viagem</SelectItem>
-                                            <SelectItem value="Pós-viagem">Pós-viagem</SelectItem>
-                                            <SelectItem value="Manutenção Preventiva">Manutenção Preventiva</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control}
-                            name="data_inspecao"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Data e Hora da Inspeção</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            type="text"
-                                            value={field.value}
-                                            readOnly
-                                            {...field}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                    </CardContent>
-                </Card>
-
-                {/* Status do Checklist */}
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
-                                <Badge variant={totalNaoConformidades === 0 ? "default" : "destructive"} className="text-base px-3 py-1">
-                                    {totalNaoConformidades === 0 ? "APROVADO" : "REPROVADO"}
-                                </Badge>
-                                <div className="flex items-center space-x-2">
-                                    <AlertTriangle className="h-4 w-4 text-orange-500" />
-                                    <span className="text-sm">
-                                        <strong>Total de Não Conformidades:</strong> {totalNaoConformidades}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Seções do Checklist */}
-                <ScrollArea className="h-[600px] border p-4 rounded-lg">
-                    <div className="space-y-6">
-                        {Object.entries(form.watch("secoes")).map(([secaoKey, secao]) => (
-                            <Card key={secaoKey}>
-                                <CardHeader>
-                                    <CardTitle className="text-lg">{secao.titulo}</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-6">
-                                        {secao.itens.map((item, itemIndex) => (
-                                            <div key={itemIndex} className="border rounded-lg p-4 space-y-3">
-                                                <div className="font-medium text-sm">{item.descricao}</div>
-
-                                                <div className="flex items-center space-x-6">
-
-                                                    <div className="flex items-center space-x-2">
-                                                        <Checkbox
-                                                            id={`${secaoKey}-${itemIndex}-conforme`}
-                                                            checked={item.conforme}
-                                                            onCheckedChange={(checked) => {
-                                                                updateItemField(secaoKey as keyof typeof secoesTemplate, itemIndex, 'conforme', checked as boolean);
-                                                            }}
-                                                        />
-                                                        <label
-                                                            htmlFor={`${secaoKey}-${itemIndex}-conforme`}
-                                                            className="text-sm font-medium text-green-600 cursor-pointer"
-                                                        >
-                                                            Conforme
-                                                        </label>
-                                                    </div>
-
-                                                    <div className="flex items-center space-x-2">
-                                                        <Checkbox
-                                                            id={`${secaoKey}-${itemIndex}-nao-conforme`}
-                                                            checked={!item.conforme}
-                                                            onCheckedChange={(checked) => {
-                                                                updateItemField(secaoKey as keyof typeof secoesTemplate, itemIndex, 'conforme', !(checked as boolean));
-                                                            }}
-                                                        />
-                                                        <label
-                                                            htmlFor={`${secaoKey}-${itemIndex}-nao-conforme`}
-                                                            className="text-sm font-medium text-red-600 cursor-pointer"
-                                                        >
-                                                            Não Conforme
-                                                        </label>
-                                                    </div>
-                                                </div>
-
-                                                <div>
-                                                    <label className="text-sm font-medium mb-1 block">
-                                                        Observações / Ações Corretivas:
-                                                    </label>
-                                                    <Textarea
-                                                        placeholder="Descreva observações ou ações corretivas necessárias..."
-                                                        value={item.observacoes || ""}
-                                                        onChange={(e) => updateItemField(secaoKey as keyof typeof secoesTemplate, itemIndex, 'observacoes', e.target.value)}
-                                                        className="min-h-[60px]"
-                                                    />
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
+  const renderCheckItem = (
+    sectionKey: string,
+    itemKey: string,
+    label: string,
+    extraField?: 'psi' | 'especificacao' | 'luz_acesa' | 'numero_lacre'
+  ) => (
+    <Card key={`${sectionKey}.${itemKey}`} className="mb-4">
+      <CardContent className="pt-6">
+        <div className="space-y-4">
+          <div className="font-medium">{label}</div>
+          <FormField
+            control={form.control}
+            name={`${sectionKey}.${itemKey}.conforme` as any}
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <RadioGroup
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="conforme" id={`${sectionKey}-${itemKey}-conforme`} />
+                      <label htmlFor={`${sectionKey}-${itemKey}-conforme`} className="text-sm cursor-pointer">
+                        Conforme
+                      </label>
                     </div>
-                </ScrollArea>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="nao_conforme" id={`${sectionKey}-${itemKey}-nao-conforme`} />
+                      <label htmlFor={`${sectionKey}-${itemKey}-nao-conforme`} className="text-sm cursor-pointer">
+                        Não Conforme
+                      </label>
+                    </div>
+                  </RadioGroup>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          {extraField && (
+            <FormField
+              control={form.control}
+              name={`${sectionKey}.${itemKey}.${extraField}` as any}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {extraField === 'psi' && 'Especificar PSI'}
+                    {extraField === 'especificacao' && 'Especificar Pneu com TWI baixo'}
+                    {extraField === 'luz_acesa' && 'Especificar luz acesa'}
+                    {extraField === 'numero_lacre' && 'Nº do Lacre'}
+                  </FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder={`Digite ${extraField === 'psi' ? 'o PSI' : extraField === 'numero_lacre' ? 'o número' : 'a especificação'}`} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          )}
+          <FormField
+            control={form.control}
+            name={`${sectionKey}.${itemKey}.observacoes` as any}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Observações / Ações Corretivas</FormLabel>
+                <FormControl>
+                  <Textarea
+                    {...field}
+                    placeholder="Descreva observações ou ações corretivas necessárias..."
+                    rows={2}
+                  />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
 
-                {/* Assinaturas e Visto */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Resultado Final e Assinaturas</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <FormField
-                            control={form.control}
-                            name="assinatura_motorista"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                    <FormControl>
-                                        <Checkbox
-                                            checked={field.value}
-                                            onCheckedChange={field.onChange}
-                                        />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                        <FormLabel>Assinatura Digital do Motorista *</FormLabel>
-                                    </div>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>1. Dados Básicos da Inspeção</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="data_inspecao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data da Inspeção *</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="motorista"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Motorista Responsável *</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(Number(value))} 
+                      value={field.value?.toString()}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o motorista" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {motoristas.map((motorista) => (
+                          <SelectItem key={motorista.id} value={motorista.id.toString()}>
+                            {motorista.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="placa_veiculo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Placa do Veículo (Cavalo Mecânico) *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="ABC-1234" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="placa_implemento"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Placa do Implemento (Baú/Carreta)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="ABC-1234 (se aplicável)" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="odometro"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Odômetro (km) *</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="0" {...field} placeholder="Quilometragem atual" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="local_inspecao"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Local da Inspeção *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: Pátio Matriz, Filial São Paulo" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="tipo_checklist"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tipo de Checklist *</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o tipo" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Preventiva">Manutenção Preventiva</SelectItem>
+                        <SelectItem value="Pré-viagem">Pré-viagem</SelectItem>
+                        <SelectItem value="Pós-viagem">Pós-viagem</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </CardContent>
+        </Card>
+        <Separator />
 
-                        {totalNaoConformidades > 0 && (
-                            <FormField
-                                control={form.control}
-                                name="visto_lideranca"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                        <FormControl>
-                                            <Checkbox
-                                                checked={field.value}
-                                                onCheckedChange={field.onChange}
-                                            />
-                                        </FormControl>
-                                        <div className="space-y-1 leading-none">
-                                            <FormLabel>Visto da Liderança/Frota (Obrigatório para reprovação)</FormLabel>
-                                        </div>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        )}
-                    </CardContent>
-                </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Seção 1: Documentação e Obrigatoriedade Legal</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {renderCheckItem('secao1', 'item_1_1', '1.1 CNH do Motorista (Válida e na Categoria Correta)')}
+            {renderCheckItem('secao1', 'item_1_2', '1.2 CRLV (Licenciamento) - Veículo e Implemento, válidos')}
+            {renderCheckItem('secao1', 'item_1_3', '1.3 Exame Toxicológico (Se aplicável à categoria)')}
+            {renderCheckItem('secao1', 'item_1_4', '1.4 Extintor de Incêndio (Cheio, Válido e Acessível)')}
+            {renderCheckItem('secao1', 'item_1_5', '1.5 Triângulo de Sinalização (Completo e íntegro)')}
+            {renderCheckItem('secao1', 'item_1_6', '1.6 Macaco e Chave de Roda (Em condições de uso)')}
+          </CardContent>
+        </Card>
 
-                {/* Actions */}
-                <div className="flex justify-end space-x-4">
-                    <Button type="submit" disabled={loading}>
-                        {loading ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        ) : (
-                            <Save className="mr-2 h-4 w-4" />
-                        )}
-                        Salvar Checklist
-                    </Button>
-                </div>
-            </form>
-        </Form>
-    );
+        <Card>
+          <CardHeader>
+            <CardTitle>Seção 2: Sistema de Freios e Rodagem</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {renderCheckItem('secao2', 'item_2_1', '2.1 Pressão dos Pneus (Conforme manual de carga)', 'psi')}
+            {renderCheckItem('secao2', 'item_2_2', '2.2 Profundidade dos Sulcos (TWI) - Acima do limite legal', 'especificacao')}
+            {renderCheckItem('secao2', 'item_2_3', '2.3 Estado Visual dos Pneus (Sem bolhas, cortes ou avarias laterais)')}
+            {renderCheckItem('secao2', 'item_2_4', '2.4 Rodas e Fixação (Sem folgas, porcas apertadas e íntegras)')}
+            {renderCheckItem('secao2', 'item_2_5', '2.5 Freio de Serviço (Pedal) - Acionamento firme, sem "borracha"')}
+            {renderCheckItem('secao2', 'item_2_6', '2.6 Freio de Estacionamento (Travamento eficiente)')}
+            {renderCheckItem('secao2', 'item_2_7', '2.7 Nível de Fluido de Freio (Dentro da marcação MIN/MAX)')}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Seção 3: Níveis de Fluidos e Motor</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {renderCheckItem('secao3', 'item_3_1', '3.1 Nível de Óleo do Motor (Entre as marcas de verificação)')}
+            {renderCheckItem('secao3', 'item_3_2', '3.2 Nível de Água do Radiador (Líquido de arrefecimento)')}
+            {renderCheckItem('secao3', 'item_3_3', '3.3 Nível de Arla 32 (Se veículo for Diesel Euro V/VI)')}
+            {renderCheckItem('secao3', 'item_3_4', '3.4 Vazamentos Aparentes (Motor, transmissão, eixos)')}
+            {renderCheckItem('secao3', 'item_3_5', '3.5 Mangueiras e Correias (Sem rachaduras, bom tensionamento)')}
+            {renderCheckItem('secao3', 'item_3_6', '3.6 Funcionamento do Motor (Marcha lenta estável, sem ruídos estranhos)')}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Seção 4: Iluminação, Sinalização e Elétrica</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {renderCheckItem('secao4', 'item_4_1', '4.1 Faróis (Alto e Baixo)')}
+            {renderCheckItem('secao4', 'item_4_2', '4.2 Lanternas Dianteiras e Traseiras')}
+            {renderCheckItem('secao4', 'item_4_3', '4.3 Luzes de Freio (Incluindo 3ª Luz de Freio)')}
+            {renderCheckItem('secao4', 'item_4_4', '4.4 Luzes Indicadoras de Direção (Setas)')}
+            {renderCheckItem('secao4', 'item_4_5', '4.5 Pisca-Alerta (Funcionamento simultâneo)')}
+            {renderCheckItem('secao4', 'item_4_6', '4.6 Buzina e Limpador de Para-brisa')}
+            {renderCheckItem('secao4', 'item_4_7', '4.7 Painel de Instrumentos (Sem luzes de alerta acesas)', 'luz_acesa')}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Seção 5: Cabine e Condições Gerais (Estética e Interna)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {renderCheckItem('secao5', 'item_5_1', '5.1 Para-brisa e Vidros (Sem trincas ou avarias que obstruam a visão)')}
+            {renderCheckItem('secao5', 'item_5_2', '5.2 Espelhos Retrovisores (Limpos, fixos e sem quebras)')}
+            {renderCheckItem('secao5', 'item_5_3', '5.3 Condição do Assento e Cinto (Ajustáveis e funcionais)')}
+            {renderCheckItem('secao5', 'item_5_4', '5.4 Nível de Combustível (Recomendado: acima de 1/4 do tanque)')}
+            {renderCheckItem('secao5', 'item_5_5', '5.5 Limpeza e Organização da Cabine (Sem lixo ou objetos soltos)')}
+            {renderCheckItem('secao5', 'item_5_6', '5.6 Tapetes e Forrações (Limpos e sem danos significativos)')}
+            {renderCheckItem('secao5', 'item_5_7', '5.7 Maçanetas Externas e Internas (Funcionamento suave e sem quebras)')}
+            {renderCheckItem('secao5', 'item_5_8', '5.8 Pintura Danificada (Cabine) - Pontos de ferrugem, riscos profundos')}
+            {renderCheckItem('secao5', 'item_5_9', '5.9 Lataria Danificada (Cabine) - Amassados, partes soltas ou desalinhadas')}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Seção 6: Implemento (Baú, Sider, Carroceria) e Segurança da Carga</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {renderCheckItem('secao6', 'item_6_1', '6.1 Estado Geral do Implemento (Estrutura e Chassi sem trincas ou deformações)')}
+            {renderCheckItem('secao6', 'item_6_2', '6.2 Pintura Danificada (Implemento) - Rachaduras ou perda de pintura que exponham o material')}
+            {renderCheckItem('secao6', 'item_6_3', '6.3 Lataria Danificada (Implemento) - Amassados profundos ou painéis soltos')}
+            {renderCheckItem('secao6', 'item_6_4', '6.4 Portas/Tampas e Travamento (Vedação e fechaduras eficientes e seguras)')}
+            {renderCheckItem('secao6', 'item_6_5', '6.5 Piso do Compartimento de Carga (Limpo, seco e sem avarias estruturais)')}
+            {renderCheckItem('secao6', 'item_6_6', '6.6 Dispositivos de Amarração (Cintas, catracas ou pontos de fixação íntegros)')}
+            {renderCheckItem('secao6', 'item_6_7', '6.7 Lacre/Segurança da Carga (Verificar integridade/número do lacre, se aplicável)', 'numero_lacre')}
+          </CardContent>
+        </Card>
+        <Separator />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Anexos e Evidências Fotográficas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ImageUpload images={images} onImagesChange={setImages} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>3. Resultado Final e Assinaturas</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 bg-muted rounded-lg">
+                <div className="text-sm text-muted-foreground mb-1">Total de Não Conformidades</div>
+                <div className="text-3xl font-bold">{totalNaoConformidades}</div>
+                <p className="text-xs text-muted-foreground mt-1">Calculado automaticamente</p>
+              </div>
+              <FormField
+                control={form.control}
+                name="status_final"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status Final da Inspeção *</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Aprovado">APROVADO</SelectItem>
+                        <SelectItem value="Reprovado">REPROVADO</SelectItem>
+                        <SelectItem value="Pendente">PENDENTE</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="assinatura_motorista"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Assinatura do Motorista (URL ou Base64)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Cole a URL ou Base64 da assinatura digital" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="visto_lideranca"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Visto da Liderança/Frota (URL ou Base64)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Cole a URL ou Base64 do visto" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-end gap-4">
+          <Button type="submit" disabled={isLoading} size="lg">
+            {isLoading ? 'Salvando...' : 'Salvar Checklist Completo'}
+          </Button>
+        </div>
+      </form>
+    </Form>
+  );
 }

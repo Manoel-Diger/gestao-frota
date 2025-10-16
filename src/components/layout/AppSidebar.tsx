@@ -9,7 +9,7 @@ import {
   Settings,
   Home,
   FileText,
-  List, // Adicionado para representar Checklist
+  ClipboardCheck,
 } from "lucide-react";
 
 import {
@@ -30,9 +30,9 @@ const navigationItems = [
   { title: "Motoristas", url: "/drivers", icon: Users },
   { title: "Manutenções", url: "/maintenance", icon: Wrench },
   { title: "Abastecimentos", url: "/fuel", icon: Fuel },
+  { title: "Checklists", url: "/checklist", icon: ClipboardCheck },
   { title: "Relatórios", url: "/reports", icon: BarChart3 },
   { title: "Alertas", url: "/alerts", icon: AlertTriangle },
-  { title: "Checklist", url: "/checklist", icon: List }, // Novo item adicionado
 ];
 
 const settingsItems = [
@@ -69,7 +69,7 @@ export function AppSidebar() {
             </div>
             {!collapsed && (
               <div>
-                <h1 className="text-lg font-bold text-fleet-sidebar-foreground">FrotaPro</h1>
+                <h1 className="text-lg font-bold text-fleet-sidebar-foreground">FleetManager</h1>
                 <p className="text-xs text-fleet-sidebar-foreground/60">Gestão de Frotas</p>
               </div>
             )}
