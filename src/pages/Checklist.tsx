@@ -53,7 +53,7 @@ const capitalize = (s: string) => {
 };
 
 export default function Checklist() {
-  const { checklists, loading, refetch } = useChecklists();
+  const { checklists, loading, error, refetch } = useChecklists();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedChecklist, setSelectedChecklist] = useState<any>(null);
   const [viewChecklist, setViewChecklist] = useState<any>(null);
