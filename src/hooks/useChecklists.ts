@@ -36,19 +36,15 @@ export function useChecklists() {
     try {
       setLoading(true);
       
+      // CORREÇÃO APLICADA AQUI:
+      // Usando a sintaxe 'fk_column_name(campos)' que é mais robusta
+      // Assumindo que as colunas FK são 'motorista' e 'veiculo'
       const { data, error } = await supabase
         .from('checklists')
         .select(`
           *,
-          Motoristas!fk_checklists_motorista (
-            id,
-            nome
-          ),
-          Veiculos!fk_checklists_veiculo (
-            modelo,
-            marca,
-            placa
-          )
+          motorista:Motoristas(id, nome),
+          veiculo:Veiculos(modelo, marca, placa)
         `)
         .order('created_at', { ascending: false });
 
@@ -56,10 +52,12 @@ export function useChecklists() {
 
       const transformedData = (data || []).map((item: any) => ({
         ...item,
-        motorista: item.Motoristas?.id || item.motorista,
-        motorista_nome: item.Motoristas?.nome || 'N/A',
-        veiculo_info: item.Veiculos
-          ? `${item.Veiculos.marca} ${item.Veiculos.modelo} (${item.Veiculos.placa})`
+        // CORREÇÃO NA DESESTRUTURAÇÃO:
+        // Agora, os dados aninhados virão nas chaves 'motorista' e 'veiculo'
+        motorista: item.motorista?.id || item.motorista,
+        motorista_nome: item.motorista?.nome || 'N/A',
+        veiculo_info: item.veiculo
+          ? `${item.veiculo.marca} ${item.veiculo.modelo} (${item.veiculo.placa})`
           : item.placa_veiculo || 'N/A'
       }));
 
