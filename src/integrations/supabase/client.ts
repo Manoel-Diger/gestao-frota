@@ -2,42 +2,48 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = "https://edqeymtqmgegudwcnzfw.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkcWV5bXRxbWdlZ3Vkd2NuemZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg2MzQxNDMsImV4cCI6MjA3NDIxMDE0M30.vbjCkJg_kVm50MzyjP_u9qWvDvIm41g7d9TET4EfXpU";
+// **INÍCIO DA CORREÇÃO**
+
+// Lendo as variáveis de ambiente que foram configuradas no Vercel (com prefixo VITE_):
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://edqeymtqmgegudwcnzfw.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkcWV5bXRxbWdlZ3Vkd2NuemZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg2MzQxNDMsImV4cCI6MjA3NDIxMDE0M30.vbjCkJg_kVm50MzyjP_u9qWvDvIm41g7d9TET4EfXpU";
+
+// **FIM DA CORREÇÃO**
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// O código abaixo permanece o mesmo, mas agora usa as variáveis do Vercel
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-  global: {
-    headers: {
-      'X-Client-Info': 'gestao-frota@1.0.0',
-    },
-  },
-  db: {
-    schema: 'public',
-  },
+  auth: {
+    storage: localStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'gestao-frota@1.0.0',
+    },
+  },
+  db: {
+    schema: 'public',
+  },
 });
 
 // Helper function to check if client is connected
 export const checkSupabaseConnection = async () => {
-  try {
-    const { data, error } = await supabase.from('Veiculos').select('count', { count: 'exact', head: true });
-    if (error) {
-      console.error('Supabase connection error:', error.message);
-      return false;
-    }
-    return true;
-  } catch (error) {
-    console.error('Supabase connection error:', error instanceof Error ? error.message : 'Unknown error');
-    return false;
-  }
+  try {
+    const { data, error } = await supabase.from('Veiculos').select('count', { count: 'exact', head: true });
+    if (error) {
+      console.error('Supabase connection error:', error.message);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Supabase connection error:', error instanceof Error ? error.message : 'Unknown error');
+    return false;
+  }
 };
 
 // Export database types for convenience
