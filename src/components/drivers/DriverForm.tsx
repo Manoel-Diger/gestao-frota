@@ -14,7 +14,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -30,23 +29,13 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Plus } from "lucide-react";
-import { TablesUpdate } from "@/integrations/supabase/types";
 
-// --- Tipagem corrigida e alinhada ao banco ---
-type VeiculosUpdatePayload = TablesUpdate<"Veiculos"> & {
-  motorista?: string | null;
-};
-
-interface VehiclePlateResult {
-  placa: string;
-}
-
+// Definição de tipos preservada
 interface MotoristaData {
   id?: number;
   categoria_cnh: "A" | "B" | "C" | "D" | "E" | "AB" | "AC" | "AD" | "AE";
   cnh_numero: string;
   cnh_validade: string;
-  created_at?: string;
   email: string;
   nome: string;
   status: "Ativo" | "Inativo";
@@ -54,31 +43,28 @@ interface MotoristaData {
   placa?: string | null;
 }
 
-// --- Schema de validação ---
 const driverSchema = z.object({
   nome: z.string().min(2, "Nome é obrigatório"),
   email: z.string().email("Email inválido"),
-  telefone: z.string().min(10, "Telefone deve ter pelo menos 10 caracteres"),
-  categoria_cnh: z.enum(["A", "B", "C", "D", "E", "AB", "AC", "AD", "AE"]),
-  cnh_numero: z.string().min(5, "Número da CNH é obrigatório"),
+  telefone: z.string().min(10, "Telefone é obrigatório"),
+  categoria_cnh: z.string().min(1, "Selecione a categoria"),
+  cnh_numero: z.string().optional(),
   cnh_validade: z.string().min(1, "Data de validade é obrigatória"),
   status: z.enum(["Ativo", "Inativo"]),
-  placa: z.string().optional().or(z.literal("")).transform(e => e === "" ? null : e),
+  placa: z.string().optional().nullable().transform(v => v === "none" || v === "" ? null : v),
 });
 
 type DriverFormData = z.infer<typeof driverSchema>;
 
-interface DriverFormProps {
-  onSuccess?: () => void;
-  motorista?: MotoristaData;
-  isOpen: boolean;
-  setIsOpen: (open: boolean) => void;
-}
-
-export function DriverForm({ onSuccess, motorista, isOpen, setIsOpen }: DriverFormProps) {
+export function DriverForm({ onSuccess, motorista, isOpen: externalIsOpen, setIsOpen: setExternalIsOpen }: any) {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [availableVehicles, setAvailableVehicles] = useState<string[]>([]);
   const { toast } = useToast();
+
+  // Gerencia se o diálogo é controlado interna ou externamente (para o botão "Editar")
+  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen;
+  const setIsOpen = setExternalIsOpen !== undefined ? setExternalIsOpen : setInternalIsOpen;
 
   const form = useForm<DriverFormData>({
     resolver: zodResolver(driverSchema),
@@ -94,19 +80,11 @@ export function DriverForm({ onSuccess, motorista, isOpen, setIsOpen }: DriverFo
     },
   });
 
-  // 🔹 Carregar placas de veículos disponíveis
+  // Busca as placas na tabela 'Veiculos'
   useEffect(() => {
     const fetchVehicles = async () => {
-      const { data, error } = await supabase
-        .from("Veiculos")
-        .select("placa") as { data: VehiclePlateResult[] | null; error: any };
-
-      if (error) {
-        console.error("Erro ao buscar veículos:", error);
-      } else if (data) {
-        const plates = data.map((v) => v.placa);
-        setAvailableVehicles(plates.filter((p): p is string => p !== null));
-      }
+      const { data } = await supabase.from("Veiculos").select("placa");
+      if (data) setAvailableVehicles(data.map(v => v.placa));
     };
     fetchVehicles();
   }, []);
@@ -114,118 +92,52 @@ export function DriverForm({ onSuccess, motorista, isOpen, setIsOpen }: DriverFo
   const onSubmit = async (formData: DriverFormData) => {
     try {
       setLoading(true);
-      const novaPlaca = formData.placa;
-      const oldPlaca = motorista?.placa || null;
+      
+      const motoristaPayload = {
+        nome: formData.nome,
+        email: formData.email,
+        telefone: formData.telefone,
+        status: formData.status,
+        categoria_cnh: formData.categoria_cnh,
+        validade_cnh: formData.cnh_validade, // CORREÇÃO: usar validade_cnh (minúsculo)
+        placa: formData.placa,
+      };
 
-      // 🔸 Validação: a placa deve existir no cadastro de veículos
-      if (novaPlaca && !availableVehicles.includes(novaPlaca)) {
-        toast({
-          title: "Erro de Validação",
-          description: "A placa informada não existe no cadastro de veículos.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
+      // Guardar placa anterior para limpar depois
+      const placaAnterior = motorista?.placa;
 
       if (motorista?.id) {
-        // --- MODO EDIÇÃO ---
-        const { error: motorError } = await supabase
-          .from("Motoristas")
-          .update({
-            nome: formData.nome,
-            email: formData.email,
-            telefone: formData.telefone,
-            categoria_cnh: formData.categoria_cnh,
-            cnh_numero: formData.cnh_numero,
-            cnh_validade: formData.cnh_validade,
-            status: formData.status,
-            placa: novaPlaca,
-          })
-          .eq("id", motorista.id);
-
-        if (motorError) {
-          throw new Error(`Erro ao atualizar motorista: ${motorError.message}`);
-        }
-
-        // --- SINCRONIZAÇÃO COM VEÍCULOS ---
-
-        // A) Desassocia veículo antigo, se necessário
-        if (oldPlaca && oldPlaca !== novaPlaca) {
-          const { error: desassocError } = await supabase
-            .from("Veiculos")
-            .update({ motorista: null } as VeiculosUpdatePayload)
-            .eq("placa", oldPlaca);
-
-          if (desassocError) {
-            console.error("Erro ao desassociar veículo antigo:", desassocError);
-          }
-        }
-
-        // B) Associa novo veículo, se necessário
-        if (novaPlaca) {
-          const { error: assocError } = await supabase
-            .from("Veiculos")
-            .update({ motorista: formData.nome } as VeiculosUpdatePayload)
-            .eq("placa", novaPlaca);
-
-          if (assocError) {
-            throw new Error(`Erro ao associar veículo: ${assocError.message}`);
-          }
-        }
-
-        toast({
-          title: "Sucesso!",
-          description: "Motorista atualizado e veículo sincronizado com sucesso.",
-        });
-
+        const { error } = await supabase.from("Motoristas").update(motoristaPayload).eq("id", motorista.id);
+        if (error) throw error;
       } else {
-        // --- MODO CRIAÇÃO ---
-        const { error: motorError } = await supabase.from("Motoristas").insert([
-          {
-            nome: formData.nome,
-            email: formData.email,
-            telefone: formData.telefone,
-            categoria_cnh: formData.categoria_cnh,
-            cnh_numero: formData.cnh_numero,
-            cnh_validade: formData.cnh_validade,
-            status: formData.status,
-            placa: novaPlaca,
-          },
-        ]);
-
-        if (motorError) {
-          throw new Error(`Erro ao cadastrar motorista: ${motorError.message}`);
-        }
-
-        // Se houver placa, associa o veículo ao novo motorista
-        if (novaPlaca) {
-          const { error: assocError } = await supabase
-            .from("Veiculos")
-            .update({ motorista: formData.nome } as VeiculosUpdatePayload)
-            .eq("placa", novaPlaca);
-
-          if (assocError) {
-            throw new Error(`Erro ao sincronizar veículo: ${assocError.message}`);
-          }
-        }
-
-        toast({
-          title: "Sucesso!",
-          description: "Motorista cadastrado e veículo sincronizado com sucesso.",
-        });
+        const { error } = await supabase.from("Motoristas").insert([motoristaPayload]);
+        if (error) throw error;
       }
 
-      form.reset();
-      setIsOpen(false);
-      onSuccess?.();
+      // CORREÇÃO 1: Limpar veículo anterior se mudou
+      if (placaAnterior && placaAnterior !== formData.placa) {
+        await supabase
+          .from("Veiculos")
+          .update({ motorista: null })
+          .eq("placa", placaAnterior);
+      }
 
-    } catch (error) {
-      toast({
-        title: "Erro Fatal na Transação",
-        description: error instanceof Error ? error.message : "Erro desconhecido ao processar a solicitação",
-        variant: "destructive",
-      });
+      // CORREÇÃO 2: Atualizar novo veículo
+      if (formData.placa) {
+        const { error: updateError } = await supabase
+          .from("Veiculos")
+          .update({ motorista: formData.nome }) 
+          .eq("placa", formData.placa);
+        
+        if (updateError) throw updateError;
+      }
+
+      toast({ title: "Sucesso!", description: "Dados salvos com sucesso." });
+      setIsOpen(false);
+      form.reset();
+      onSuccess?.();
+    } catch (error: any) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -233,164 +145,72 @@ export function DriverForm({ onSuccess, motorista, isOpen, setIsOpen }: DriverFo
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-gradient-primary hover:bg-primary-hover w-full sm:w-auto">
-          <Plus className="mr-2 h-4 w-4" />
-          {motorista ? "Editar Motorista" : "Novo Motorista"}
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+      {/* O botão "Novo Motorista" agora faz parte do componente */}
+      {!motorista && (
+        <DialogTrigger asChild>
+          <Button className="bg-blue-600 hover:bg-blue-700">
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Motorista
+          </Button>
+        </DialogTrigger>
+      )}
+      
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{motorista ? "Editar Motorista" : "Cadastrar Novo Motorista"}</DialogTitle>
-          <DialogDescription>
-            {motorista
-              ? "Atualize os dados do motorista."
-              : "Preencha os dados para adicionar um novo motorista."}
-          </DialogDescription>
         </DialogHeader>
-
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="nome"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome</FormLabel>
-                    <FormControl>
-                      <Input placeholder="João Silva" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="joao@exemplo.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="telefone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Telefone</FormLabel>
-                    <FormControl>
-                      <Input placeholder="(11) 99999-9999" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="placa"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Placa do Veículo</FormLabel>
-                    <FormControl>
-                      <Input placeholder="ABC-1234" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="categoria_cnh"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Categoria CNH</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a categoria" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {["A", "B", "C", "D", "E", "AB", "AC", "AD", "AE"].map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="cnh_numero"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Número da CNH</FormLabel>
-                    <FormControl>
-                      <Input placeholder="12345678901" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="cnh_validade"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Validade da CNH</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem className="sm:col-span-2">
-                    <FormLabel>Status</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Ativo">Ativo</SelectItem>
-                        <SelectItem value="Inativo">Inativo</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="nome" render={({ field }) => (
+                <FormItem><FormLabel>Nome</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="email" render={({ field }) => (
+                <FormItem><FormLabel>Email</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="telefone" render={({ field }) => (
+                <FormItem><FormLabel>Telefone</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="placa" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Placa do Veículo</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {availableVehicles.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="categoria_cnh" render={({ field }) => (
+                <FormItem><FormLabel>Categoria CNH</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {["A", "B", "C", "D", "E", "AB", "AC", "AD", "AE"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="cnh_numero" render={({ field }) => (
+                <FormItem><FormLabel>Número da CNH (Opcional)</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
+              )} />
+              <FormField control={form.control} name="cnh_validade" render={({ field }) => (
+                <FormItem><FormLabel>Validade da CNH</FormLabel><FormControl><Input type="date" {...field} /></FormControl></FormItem>
+              )} />
+              <FormField control={form.control} name="status" render={({ field }) => (
+                <FormItem><FormLabel>Status</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent><SelectItem value="Ativo">Ativo</SelectItem><SelectItem value="Inativo">Inativo</SelectItem></SelectContent>
+                  </Select>
+                </FormItem>
+              )} />
             </div>
-
-            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsOpen(false)}
-                disabled={loading}
-                className="w-full sm:w-auto"
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={loading} className="w-full sm:w-auto">
-                {loading ? "Salvando..." : motorista ? "Atualizar Motorista" : "Salvar Motorista"}
-              </Button>
-            </div>
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
+              {loading ? "Salvando..." : "Salvar Motorista"}
+            </Button>
           </form>
         </Form>
       </DialogContent>
