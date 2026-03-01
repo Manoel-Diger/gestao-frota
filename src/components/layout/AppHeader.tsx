@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Bell, Search, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +13,49 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+
+type Alert = {
+  id: number; // corrigido
+  tipo_alerta: string;
+  descricao: string;
+  created_at: string;
+};
 
 export function AppHeader() {
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+
+  const fetchAlerts = async () => {
+    const { data, error } = await supabase
+      .from("Alertas")
+      .select("id, tipo_alerta, descricao, created_at")
+      .eq("ativo", true)
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      setAlerts(data);
+    }
+  };
+
+  useEffect(() => {
+    fetchAlerts();
+
+    const channel = supabase
+      .channel("alertas-realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "Alertas" },
+        () => {
+          fetchAlerts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   return (
     <header className="h-16 bg-fleet-header border-b border-border flex items-center justify-between px-6 shadow-sm">
       <div className="flex items-center gap-4">
@@ -29,15 +71,46 @@ export function AppHeader() {
 
       <div className="flex items-center gap-4">
         {/* Notifications */}
-        <Button variant="outline" size="icon" className="relative">
-          <Bell className="h-4 w-4" />
-          <Badge 
-            variant="destructive" 
-            className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-          >
-            3
-          </Badge>
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" className="relative">
+              <Bell className="h-4 w-4" />
+              {alerts.length > 0 && (
+                <Badge
+                  variant="destructive"
+                  className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                >
+                  {alerts.length}
+                </Badge>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent align="end" className="w-80">
+            <DropdownMenuLabel>Notificações</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+
+            {alerts.length === 0 ? (
+              <DropdownMenuItem disabled>
+                Nenhum alerta ativo
+              </DropdownMenuItem>
+            ) : (
+              alerts.map((alert) => (
+                <DropdownMenuItem
+                  key={alert.id}
+                  className="flex flex-col items-start gap-1 py-2"
+                >
+                  <span className="font-semibold text-sm">
+                    {alert.tipo_alerta}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {alert.descricao}
+                  </span>
+                </DropdownMenuItem>
+              ))
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* User Menu */}
         <DropdownMenu>
