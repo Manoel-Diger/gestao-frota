@@ -50,7 +50,7 @@ export function AppHeader() {
                 </AvatarFallback>
               </Avatar>
               <div className="hidden md:block text-left">
-                <p className="text-sm font-medium">João Silva</p>
+                <p className="text-sm font-medium">Manoel Armenteiro</p>
                 <p className="text-xs text-muted-foreground">Administrador</p>
               </div>
             </Button>
