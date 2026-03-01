@@ -10,7 +10,7 @@ export function AppLayout() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background text-foreground">
+      <div className="h-screen flex w-full bg-background text-foreground">
         <AppSidebar />
 
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -24,7 +24,7 @@ export function AppLayout() {
             </AnimatePresence>
           </main>
 
-          <footer className="border-t bg-background py-6 text-center text-sm text-muted-foreground">
+          <footer className="border-t bg-background py-4 text-center text-sm text-muted-foreground">
             <span className="font-medium text-foreground">
               © {new Date().getFullYear()}
             </span>{" "}
