@@ -14,17 +14,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useManutencoes } from "@/hooks/useManutencoes";
-import { Tables } from "@/integrations/supabase/types";
-
-type Manutencao = Tables<'Manutencoes'>;
 
 export default function Maintenance() {
-  const { manutencoes, loading, error, refetch, deleteManutencao } = useManutencoes();
+  const { manutencoes, loading, error, refetch } = useManutencoes();
   const [searchTerm, setSearchTerm] = useState("");
-  
-  // BUG #2 CORRIGIDO: Estados para controlar edição
-  const [editingManutencao, setEditingManutencao] = useState<Manutencao | null>(null);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // Filtragem com useMemo
   const filteredManutencoes = useMemo(() => {
@@ -59,25 +52,15 @@ export default function Maintenance() {
     return "outro";
   };
 
-  // BUG #1 CORRIGIDO: Cálculos sempre sobre filteredManutencoes
+  // Cálculos dinâmicos por filtro
   const stats = useMemo(() => {
-    // SEMPRE usar filteredManutencoes, que já contém a lista correta (completa ou filtrada)
-    const totalCusto = filteredManutencoes.reduce((sum, man) => {
-      const custo = typeof man.custo === 'number' ? man.custo : parseFloat(String(man.custo || 0));
-      return sum + custo;
-    }, 0);
-    
-    const totalManutencoes = filteredManutencoes.length;
+    const filtered = searchTerm ? filteredManutencoes : manutencoes;
+    const totalCusto = filtered.reduce((sum, man) => sum + (Number(man.custo) || 0), 0);
+    const totalManutencoes = filtered.length;
     const custoMedio = totalManutencoes > 0 ? totalCusto / totalManutencoes : 0;
 
-    // Contar status sobre a lista filtrada
-    const agendadas = filteredManutencoes.filter((m) => 
-      statusKey((m as any).status) === 'agendada'
-    ).length;
-    
-    const concluidas = filteredManutencoes.filter((m) => 
-      statusKey((m as any).status) === 'concluida'
-    ).length;
+    const agendadas = filtered.filter((m) => statusKey((m as any).status) === 'agendada').length;
+    const concluidas = filtered.filter((m) => statusKey((m as any).status) === 'concluida').length;
 
     return {
       totalCusto,
@@ -86,75 +69,36 @@ export default function Maintenance() {
       agendadas,
       concluidas,
     };
-  }, [filteredManutencoes]); // Dependência ÚNICA: filteredManutencoes
+  }, [manutencoes, filteredManutencoes, searchTerm]);
 
-  // Badges com cores usando classes do Tailwind existentes
-  const getStatusBadge = (status: string | null) => {
-    const key = statusKey(status);
-    const displayText = status || 'Agendada';
-    
-    switch (key) {
+  const getStatusVariant = (status: string | null) => {
+    switch (statusKey(status)) {
       case "concluida":
-        return (
-          <Badge className="bg-emerald-500 hover:bg-emerald-600 text-white border-0">
-            {displayText}
-          </Badge>
-        );
+        return "default"; // concluída/finalizada: azul
       case "cancelada":
-        return <Badge variant="destructive">{displayText}</Badge>;
+        return "destructive"; // cancelada: vermelho
       case "agendada":
-        return (
-          <Badge className="bg-amber-500 hover:bg-amber-600 text-white border-0">
-            {displayText}
-          </Badge>
-        );
+        return "secondary"; // agendada: cinza/neutro
       default:
-        return <Badge variant="outline">{displayText}</Badge>;
+        return "outline";
     }
   };
 
   const handleView = (id: number) => {
-    const manutencao = manutencoes.find(m => m.id === id);
-    if (manutencao) {
-      console.log("📋 Visualizar manutenção:", manutencao);
-      // TODO: Implementar modal de visualização (read-only)
-      alert(`Visualização:\n\nPlaca: ${manutencao.veiculo_placa}\nTipo: ${manutencao.tipo_manutencao}\nCusto: R$ ${typeof manutencao.custo === 'number' ? manutencao.custo.toFixed(2) : '0.00'}`);
-    }
+    console.log("Visualizar manutenção:", id);
+    // TODO: Implementar modal de visualização
   };
 
-  // BUG #2 CORRIGIDO: Implementar edição real
   const handleEdit = (id: number) => {
-    const manutencao = manutencoes.find(m => m.id === id);
-    if (manutencao) {
-      console.log("✏️ Editar manutenção:", manutencao);
-      setEditingManutencao(manutencao);
-      setIsEditDialogOpen(true);
-    }
+    console.log("Editar manutenção:", id);
+    // TODO: Implementar modal de edição
   };
 
-  // BUG #2 CORRIGIDO: Implementar exclusão real
   const handleDelete = async (id: number) => {
-    const manutencao = manutencoes.find(m => m.id === id);
-    if (!manutencao) return;
-
-    const confirmMsg = `Tem certeza que deseja excluir esta manutenção?\n\nPlaca: ${manutencao.veiculo_placa}\nTipo: ${manutencao.tipo_manutencao}`;
-    
-    if (confirm(confirmMsg)) {
-      console.log("🗑️ Excluindo manutenção:", id);
-      const success = await deleteManutencao(id);
-      if (success) {
-        console.log("✅ Manutenção excluída com sucesso");
-      } else {
-        console.error("🔴 Erro ao excluir manutenção");
-        alert("Erro ao excluir manutenção. Verifique as permissões.");
-      }
+    if (confirm("Tem certeza que deseja excluir esta manutenção?")) {
+      console.log("Excluir manutenção:", id);
+      // TODO: Implementar exclusão
     }
-  };
-
-  const handleEditSuccess = async () => {
-    await refetch();
-    setIsEditDialogOpen(false);
-    setEditingManutencao(null);
   };
 
   return (
@@ -168,20 +112,6 @@ export default function Maintenance() {
         <MaintenanceForm onSuccess={refetch} />
       </div>
 
-      {/* Dialog de Edição Separado */}
-      {editingManutencao && (
-        <MaintenanceForm
-          initialData={editingManutencao}
-          mode="edit"
-          open={isEditDialogOpen}
-          onOpenChange={(open) => {
-            setIsEditDialogOpen(open);
-            if (!open) setEditingManutencao(null);
-          }}
-          onSuccess={handleEditSuccess}
-        />
-      )}
-
       {/* Stats Cards - 5 cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card>
@@ -191,7 +121,7 @@ export default function Maintenance() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              R$ {stats.totalCusto.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              R$ {stats.totalCusto.toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">
               {searchTerm ? 'Filtrado' : 'Custo acumulado'}
@@ -206,7 +136,7 @@ export default function Maintenance() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              R$ {stats.custoMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              R$ {stats.custoMedio.toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">
               {searchTerm ? 'Filtrado' : 'Por manutenção'}
@@ -305,9 +235,7 @@ export default function Maintenance() {
                 </TableHeader>
                 <TableBody>
                   {filteredManutencoes.map((manutencao) => {
-                    const custo = typeof manutencao.custo === 'number' 
-                      ? manutencao.custo 
-                      : parseFloat(String(manutencao.custo || 0));
+                    const custo = Number(manutencao.custo) || 0;
                     
                     return (
                       <TableRow key={manutencao.id.toString()}>
@@ -325,10 +253,12 @@ export default function Maintenance() {
                             : "N/A"}
                         </TableCell>
                         <TableCell>
-                          {getStatusBadge((manutencao as any).status)}
+                          <Badge variant={getStatusVariant((manutencao as any).status)}>
+                            {(manutencao as any).status || 'Agendada'}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          R$ {custo.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          R$ {custo.toFixed(2)}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-center gap-2">

@@ -1,9 +1,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Tables, TablesInsert } from '@/integrations/supabase/types';
 
-type Abastecimento = Tables<'Abastecimentos'>;
-type AbastecimentoInsert = Omit<TablesInsert<'Abastecimentos'>, 'id' | 'created_at'>;
+export type Abastecimento = {
+  id: number;
+  created_at: string;
+  veiculo_id: number | null;
+  veiculo_placa: string | null;
+  motorista_id: number | null;
+  motorista_nome: string | null;
+  data: string;
+  litros: number;
+  custo_total: number;
+  quilometragem: number | null;
+  posto: string | null;
+};
+
+export type AbastecimentoInsert = Omit<Abastecimento, 'id' | 'created_at'>;
 
 export function useAbastecimentos() {
   const [abastecimentos, setAbastecimentos] = useState<Abastecimento[]>([]);
@@ -13,35 +25,28 @@ export function useAbastecimentos() {
   const fetchAbastecimentos = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('[useAbastecimentos] Fetching from tabela: Abastecimentos');
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('Abastecimentos')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      console.log('[useAbastecimentos] Dados carregados:', data?.length);
-      setAbastecimentos(data || []);
+      setAbastecimentos((data as Abastecimento[]) || []);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro ao carregar abastecimentos';
-      console.error('[useAbastecimentos] Erro no fetch:', msg);
-      setError(msg);
+      setError(err instanceof Error ? err.message : 'Erro ao carregar abastecimentos');
     } finally {
       setLoading(false);
     }
   }, []);
 
   const refetch = useCallback(async () => {
-    console.log('[useAbastecimentos] Refetch acionado');
     await fetchAbastecimentos();
   }, [fetchAbastecimentos]);
 
-  const createAbastecimento = useCallback(async (abastecimentoData: AbastecimentoInsert) => {
+  const createAbastecimento = useCallback(async (abastecimentoData: Partial<AbastecimentoInsert>) => {
     setError(null);
-    console.log('[useAbastecimentos] Criando abastecimento:', abastecimentoData);
-
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('Abastecimentos')
         .insert(abastecimentoData)
         .select()
@@ -50,63 +55,54 @@ export function useAbastecimentos() {
       if (error) throw error;
       if (!data) throw new Error('Falha ao criar o abastecimento.');
 
-      setAbastecimentos((prev) => [data, ...prev]);
-      console.log('[useAbastecimentos] Criado com sucesso:', data);
+      setAbastecimentos((prev) => [data as Abastecimento, ...prev]);
       return data;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao criar abastecimento.';
       setError(message);
-      console.error('[useAbastecimentos] ', message, err);
+      console.error(message, err);
       return null;
     }
   }, []);
 
   const updateAbastecimento = useCallback(async (id: number, updateData: Partial<AbastecimentoInsert>) => {
     setError(null);
-    console.log('[useAbastecimentos] Atualizando ID:', id, 'com:', updateData);
-
     try {
-      const { data, error, status } = await supabase
+      const { data, error } = await (supabase as any)
         .from('Abastecimentos')
         .update(updateData)
         .eq('id', id)
         .select()
         .single();
 
-      console.log('[useAbastecimentos] Resposta update:', { status, data, error });
-
       if (error) throw error;
-      if (!data) throw new Error('Falha ao atualizar o abastecimento (sem dados retornados).');
+      if (!data) throw new Error('Falha ao atualizar o abastecimento.');
 
       setAbastecimentos((prev) =>
-        prev.map((ab) => (ab.id === id ? data : ab))
+        prev.map((ab) => (ab.id === id ? (data as Abastecimento) : ab))
       );
-      console.log('[useAbastecimentos] Atualizado com sucesso:', data);
       return data;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao atualizar abastecimento.';
       setError(message);
-      console.error('[useAbastecimentos] ', message, err);
+      console.error(message, err);
       return null;
     }
   }, []);
 
   const deleteAbastecimento = useCallback(async (id: number) => {
     setError(null);
-    console.log('[useAbastecimentos] Deletando ID:', id);
-
     try {
-      const { error } = await supabase.from('Abastecimentos').delete().eq('id', id);
+      const { error } = await (supabase as any).from('Abastecimentos').delete().eq('id', id);
 
       if (error) throw error;
 
       setAbastecimentos((prev) => prev.filter((ab) => ab.id !== id));
-      console.log('[useAbastecimentos] Deletado com sucesso ID:', id);
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao deletar abastecimento.';
       setError(message);
-      console.error('[useAbastecimentos] ', message, err);
+      console.error(message, err);
       return false;
     }
   }, []);

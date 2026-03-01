@@ -1,11 +1,10 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Car, User, Wrench, Fuel, Clock, ClipboardCheck } from "lucide-react";
+import { Car, User, Wrench, Fuel, Clock } from "lucide-react";
 import { useVeiculos } from "@/hooks/useVeiculos";
 import { useMotoristas } from "@/hooks/useMotoristas";
 import { useManutencoes } from "@/hooks/useManutencoes";
 import { useAbastecimentos } from "@/hooks/useAbastecimentos";
-import { useChecklists } from "@/hooks/useChecklists";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -16,42 +15,11 @@ const statusColors = {
   error: "bg-destructive text-destructive-foreground",
 };
 
-interface RecentActivityProps {
-  searchFilter?: string;
-}
-
-export function RecentActivity({ searchFilter = "" }: RecentActivityProps) {
+export function RecentActivity() {
   const { veiculos } = useVeiculos();
   const { motoristas } = useMotoristas();
   const { manutencoes } = useManutencoes();
   const { abastecimentos } = useAbastecimentos();
-  const { checklists } = useChecklists();
-
-  // Aplicar filtro de placa em todos os dados
-  const filteredVeiculos = useMemo(() => {
-    if (!searchFilter) return veiculos;
-    return veiculos.filter(v => (v.placa || "").toLowerCase().includes(searchFilter));
-  }, [veiculos, searchFilter]);
-
-  const filteredAbastecimentos = useMemo(() => {
-    if (!searchFilter) return abastecimentos;
-    return abastecimentos.filter(a => (a.veiculo_placa || "").toLowerCase().includes(searchFilter));
-  }, [abastecimentos, searchFilter]);
-
-  const filteredManutencoes = useMemo(() => {
-    if (!searchFilter) return manutencoes;
-    return manutencoes.filter(m => (m.veiculo_placa || "").toLowerCase().includes(searchFilter));
-  }, [manutencoes, searchFilter]);
-
-  const filteredChecklists = useMemo(() => {
-    if (!searchFilter) return checklists;
-    return checklists.filter(c => (c.placa_veiculo || "").toLowerCase().includes(searchFilter));
-  }, [checklists, searchFilter]);
-
-  const filteredMotoristas = useMemo(() => {
-    if (!searchFilter) return motoristas;
-    return motoristas.filter(m => (m.placa || "").toLowerCase().includes(searchFilter));
-  }, [motoristas, searchFilter]);
 
   const activities = useMemo(() => {
     const allActivities: Array<{
@@ -65,8 +33,8 @@ export function RecentActivity({ searchFilter = "" }: RecentActivityProps) {
       timestamp: Date;
     }> = [];
 
-    // Manutenções recentes (filtradas)
-    filteredManutencoes.slice(0, 3).forEach((m) => {
+    // Manutenções recentes
+    manutencoes.slice(0, 3).forEach((m) => {
       const dataManutencao = m.data ? new Date(m.data) : null;
       const isPast = dataManutencao && dataManutencao < new Date();
       const status = isPast ? 'success' : 'warning';
@@ -83,8 +51,8 @@ export function RecentActivity({ searchFilter = "" }: RecentActivityProps) {
       });
     });
 
-    // Abastecimentos recentes (filtrados)
-    filteredAbastecimentos.slice(0, 3).forEach((a) => {
+    // Abastecimentos recentes
+    abastecimentos.slice(0, 3).forEach((a) => {
       allActivities.push({
         id: `abastecimento-${a.id}`,
         type: "fuel",
@@ -97,8 +65,8 @@ export function RecentActivity({ searchFilter = "" }: RecentActivityProps) {
       });
     });
 
-    // Motoristas recentes (filtrados)
-    filteredMotoristas.slice(0, 2).forEach((m) => {
+    // Motoristas recentes
+    motoristas.slice(0, 2).forEach((m) => {
       allActivities.push({
         id: `motorista-${m.id}`,
         type: "driver",
@@ -111,8 +79,8 @@ export function RecentActivity({ searchFilter = "" }: RecentActivityProps) {
       });
     });
 
-    // Veículos recentes (filtrados)
-    filteredVeiculos.slice(0, 2).forEach((v) => {
+    // Veículos recentes
+    veiculos.slice(0, 2).forEach((v) => {
       allActivities.push({
         id: `veiculo-${v.id}`,
         type: "vehicle",
@@ -120,24 +88,8 @@ export function RecentActivity({ searchFilter = "" }: RecentActivityProps) {
         title: "Veículo cadastrado",
         description: `${v.marca} ${v.modelo} - ${v.placa}`,
         time: formatDistanceToNow(new Date(v.created_at), { addSuffix: true, locale: ptBR }),
-        status: v.status?.toLowerCase() === 'ativo' ? 'success' : 'warning',
+        status: v.status?.toLowerCase() === 'ativo' || v.status?.toLowerCase() === 'disponível' ? 'success' : 'warning',
         timestamp: new Date(v.created_at),
-      });
-    });
-
-    // Checklists recentes (filtrados)
-    filteredChecklists.slice(0, 3).forEach((c) => {
-      const status = c.status_final?.toLowerCase() === 'aprovado' ? 'success' : 
-                     c.total_nao_conformidades > 0 ? 'warning' : 'info';
-      allActivities.push({
-        id: `checklist-${c.id}`,
-        type: "checklist",
-        icon: ClipboardCheck,
-        title: "Checklist realizado",
-        description: `${c.tipo_checklist} - ${c.placa_veiculo}`,
-        time: formatDistanceToNow(new Date(c.created_at), { addSuffix: true, locale: ptBR }),
-        status,
-        timestamp: new Date(c.created_at),
       });
     });
 
@@ -145,7 +97,7 @@ export function RecentActivity({ searchFilter = "" }: RecentActivityProps) {
     return allActivities
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
       .slice(0, 8);
-  }, [filteredVeiculos, filteredMotoristas, filteredManutencoes, filteredAbastecimentos, filteredChecklists]);
+  }, [veiculos, motoristas, manutencoes, abastecimentos]);
 
   return (
     <Card>
@@ -158,7 +110,7 @@ export function RecentActivity({ searchFilter = "" }: RecentActivityProps) {
       <CardContent className="space-y-4">
         {activities.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
-            {searchFilter ? "Nenhuma atividade encontrada para esta placa" : "Nenhuma atividade registrada"}
+            Nenhuma atividade registrada
           </p>
         ) : (
           activities.map((activity) => (

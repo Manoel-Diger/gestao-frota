@@ -33,10 +33,12 @@ import { Plus } from "lucide-react";
 
 const fuelSchema = z.object({
   veiculo_placa: z.string().min(1, "Veículo é obrigatório"),
+  motorista_nome: z.string().optional(),
   data: z.string().min(1, "Data é obrigatória"),
   litros: z.number().min(0.1, "Litros deve ser maior que 0"),
   quilometragem: z.number().min(0, "Quilometragem deve ser positiva"),
   custo_total: z.number().min(0.01, "Custo total deve ser maior que 0"),
+  posto: z.string().optional(),
 });
 
 type FuelFormData = z.infer<typeof fuelSchema>;
@@ -49,72 +51,68 @@ export function FuelForm({ onSuccess }: FuelFormProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [vehicles, setVehicles] = useState<any[]>([]);
+  const [motoristas, setMotoristas] = useState<any[]>([]);
   const { toast } = useToast();
 
   const form = useForm<FuelFormData>({
     resolver: zodResolver(fuelSchema),
     defaultValues: {
       veiculo_placa: "",
-      data: new Date().toISOString().split('T')[0],
+      motorista_nome: "",
+      data: "",
       litros: 0,
       quilometragem: 0,
       custo_total: 0,
+      posto: "",
     },
   });
 
   useEffect(() => {
-    const fetchVehicles = async () => {
-      const { data } = await supabase
-        .from('Veiculos')
-        .select('placa, marca, modelo, quilometragem')
-        .order('placa');
+    const fetchData = async () => {
+      const [veiculosRes, motoristasRes] = await Promise.all([
+        (supabase as any).from('Veiculos').select('placa, marca, modelo').order('placa'),
+        (supabase as any).from('Motoristas').select('id, nome').order('nome'),
+      ]);
       
-      if (data) setVehicles(data);
+      if (veiculosRes.data) setVehicles(veiculosRes.data);
+      if (motoristasRes.data) setMotoristas(motoristasRes.data);
     };
 
-    if (open) fetchVehicles();
+    if (open) fetchData();
   }, [open]);
 
   const onSubmit = async (data: FuelFormData) => {
     try {
       setLoading(true);
       
-      // 1. Insere o registro de abastecimento
-      const { error: fuelError } = await supabase
+      const { error } = await (supabase as any)
         .from('Abastecimentos')
-        .insert([{
-          veiculo_placa: data.veiculo_placa,
-          data: data.data,
-          litros: data.litros,
-          quilometragem: data.quilometragem,
-          custo_total: data.custo_total,
-        }]);
+        .insert([
+          {
+            veiculo_placa: data.veiculo_placa,
+            motorista_nome: data.motorista_nome || null,
+            data: data.data,
+            litros: data.litros,
+            quilometragem: data.quilometragem,
+            custo_total: data.custo_total,
+            posto: data.posto || null,
+          }
+        ]);
 
-      if (fuelError) throw fuelError;
-
-      // 2. CORREÇÃO: Atualiza a quilometragem atual do veículo
-      const { error: vehicleError } = await supabase
-        .from('Veiculos')
-        .update({ 
-          quilometragem: data.quilometragem,
-          combustivel_atual: 100 // Assume tanque cheio ao abastecer
-        })
-        .eq('placa', data.veiculo_placa);
-
-      if (vehicleError) throw vehicleError;
+      if (error) throw error;
 
       toast({
         title: "Sucesso!",
-        description: "Abastecimento registrado e odômetro do veículo atualizado.",
+        description: "Abastecimento registrado com sucesso.",
       });
 
       form.reset();
       setOpen(false);
       onSuccess?.();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Erro",
-        description: error.message || "Erro ao registrar abastecimento",
+        description: error instanceof Error ? error.message : "Erro ao registrar abastecimento",
         variant: "destructive",
       });
     } finally {
@@ -125,7 +123,7 @@ export function FuelForm({ onSuccess }: FuelFormProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
+        <Button className="bg-gradient-primary hover:bg-primary-hover w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
           Novo Abastecimento
         </Button>
@@ -134,7 +132,7 @@ export function FuelForm({ onSuccess }: FuelFormProps) {
         <DialogHeader>
           <DialogTitle>Registrar Abastecimento</DialogTitle>
           <DialogDescription>
-            Registre o abastecimento e atualize a quilometragem do veículo automaticamente.
+            Registre um novo abastecimento para um veículo da frota.
           </DialogDescription>
         </DialogHeader>
         
@@ -149,12 +147,40 @@ export function FuelForm({ onSuccess }: FuelFormProps) {
                     <FormLabel>Veículo</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger><SelectValue placeholder="Selecione o veículo" /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o veículo" />
+                        </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {vehicles.map((v) => (
-                          <SelectItem key={v.placa} value={v.placa}>
-                            {v.placa} - {v.marca} (KM atual: {v.quilometragem})
+                        {vehicles.map((vehicle) => (
+                          <SelectItem key={vehicle.placa} value={vehicle.placa}>
+                            {vehicle.placa} - {vehicle.marca} {vehicle.modelo}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="motorista_nome"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Motorista</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o motorista" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {motoristas.map((motorista) => (
+                          <SelectItem key={motorista.id} value={motorista.nome}>
+                            {motorista.nome}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -170,7 +196,9 @@ export function FuelForm({ onSuccess }: FuelFormProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Data</FormLabel>
-                    <FormControl><Input type="date" {...field} /></FormControl>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -183,7 +211,13 @@ export function FuelForm({ onSuccess }: FuelFormProps) {
                   <FormItem>
                     <FormLabel>Litros</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} />
+                      <Input 
+                        type="number" 
+                        step="0.01"
+                        placeholder="50.5" 
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -195,9 +229,14 @@ export function FuelForm({ onSuccess }: FuelFormProps) {
                 name="quilometragem"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Nova Quilometragem (KM)</FormLabel>
+                    <FormLabel>Quilometragem</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} onChange={(e) => field.onChange(parseInt(e.target.value) || 0)} />
+                      <Input 
+                        type="number" 
+                        placeholder="15000" 
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -208,10 +247,30 @@ export function FuelForm({ onSuccess }: FuelFormProps) {
                 control={form.control}
                 name="custo_total"
                 render={({ field }) => (
-                  <FormItem className="sm:col-span-2">
-                    <FormLabel>Custo Total (R$)</FormLabel>
+                  <FormItem>
+                    <FormLabel>Valor Total (R$)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} />
+                      <Input 
+                        type="number" 
+                        step="0.01"
+                        placeholder="275.50" 
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="posto"
+                render={({ field }) => (
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>Posto</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nome do posto de combustível" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -219,9 +278,19 @@ export function FuelForm({ onSuccess }: FuelFormProps) {
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-4">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={loading}>{loading ? "Salvando..." : "Registrar"}</Button>
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => setOpen(false)}
+                disabled={loading}
+                className="w-full sm:w-auto"
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={loading} className="w-full sm:w-auto">
+                {loading ? "Salvando..." : "Registrar Abastecimento"}
+              </Button>
             </div>
           </form>
         </Form>

@@ -1,12 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Tables } from '@/integrations/supabase/types';
 
-type Veiculo = Tables<'Veiculos'> & {
-  Motoristas?: {
-    id: number;
-    nome: string | null;
-  } | null;
+export type Veiculo = {
+  id: number;
+  created_at: string;
+  placa: string;
+  marca: string;
+  modelo: string;
+  ano: number | null;
+  quilometragem: number | null;
+  status: string | null;
+  tipo_combustivel: string | null;
+  combustivel_atual: number | null;
+  proxima_manutencao: string | null;
+  localizacao: string | null;
+  motorista: string | null;
+  motorista_id: number | null;
+  Motoristas?: { id: number; nome: string } | null;
 };
 
 export function useVeiculos() {
@@ -14,13 +24,10 @@ export function useVeiculos() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 🔹 Função centralizada de busca
-  const fetchVeiculos = async (): Promise<void> => {
+  const fetchVeiculos = useCallback(async () => {
     try {
-      setError(null);
       setLoading(true);
-
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('Veiculos')
         .select(`
           *,
@@ -32,37 +39,37 @@ export function useVeiculos() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setVeiculos(data || []);
+      setVeiculos((data as Veiculo[]) || []);
     } catch (err) {
-      console.error('Erro ao carregar veículos:', err);
       setError(err instanceof Error ? err.message : 'Erro ao carregar veículos');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchVeiculos();
-  }, []);
+  }, [fetchVeiculos]);
 
-  // 🔁 Atualização manual
-  const refreshVeiculos = async (): Promise<void> => {
+  const refreshVeiculos = useCallback(async () => {
     await fetchVeiculos();
-  };
+  }, [fetchVeiculos]);
 
-  // ❌ Exclusão de veículo
-  const deleteVeiculo = async (id: number): Promise<boolean> => {
+  const deleteVeiculo = useCallback(async (id: number) => {
     try {
-      const { error } = await supabase.from('Veiculos').delete().eq('id', id);
+      const { error } = await (supabase as any)
+        .from('Veiculos')
+        .delete()
+        .eq('id', id);
+
       if (error) throw error;
-      await fetchVeiculos(); // Atualiza após exclusão
+      setVeiculos((prev) => prev.filter((v) => v.id !== id));
       return true;
     } catch (err) {
-      console.error('Erro ao excluir veículo:', err);
       setError(err instanceof Error ? err.message : 'Erro ao excluir veículo');
       return false;
     }
-  };
+  }, []);
 
-  return { veiculos, loading, error, refreshVeiculos, deleteVeiculo };
+  return { veiculos, loading, error, refreshVeiculos, deleteVeiculo, refetch: refreshVeiculos };
 }

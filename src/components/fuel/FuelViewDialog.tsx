@@ -1,8 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { Tables } from "@/integrations/supabase/types";
-
-type Abastecimento = Tables<'Abastecimentos'>;
+import { Abastecimento } from "@/hooks/useAbastecimentos";
 
 interface FuelViewDialogProps {
   abastecimento: Abastecimento | null;
@@ -19,12 +16,12 @@ export function FuelViewDialog({ abastecimento, open, onOpenChange }: FuelViewDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="max-w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Detalhes do Abastecimento</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Placa do Veículo</p>
               <p className="text-lg font-semibold">{abastecimento.veiculo_placa || "N/A"}</p>
@@ -39,7 +36,7 @@ export function FuelViewDialog({ abastecimento, open, onOpenChange }: FuelViewDi
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Litros</p>
               <p className="text-lg font-semibold">{litros.toFixed(1)}L</p>
@@ -47,21 +44,35 @@ export function FuelViewDialog({ abastecimento, open, onOpenChange }: FuelViewDi
             <div>
               <p className="text-sm font-medium text-muted-foreground">Quilometragem</p>
               <p className="text-lg font-semibold">
-                {abastecimento.quilometragem?.toLocaleString('pt-BR') || '-'} km
+                {Number(abastecimento.quilometragem)?.toLocaleString('pt-BR') || '-'} km
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Custo Total</p>
-              <p className="text-lg font-semibold text-green-600">R$ {custoTotal.toFixed(2)}</p>
+              <p className="text-lg font-semibold text-success">R$ {custoTotal.toFixed(2)}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-muted-foreground">Preço por Litro</p>
               <p className="text-lg font-semibold">R$ {precoLitro.toFixed(2)}</p>
             </div>
           </div>
+
+          {abastecimento.motorista_nome && (
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Motorista</p>
+              <p className="text-lg font-semibold">{abastecimento.motorista_nome}</p>
+            </div>
+          )}
+
+          {abastecimento.posto && (
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Posto</p>
+              <p className="text-lg font-semibold">{abastecimento.posto}</p>
+            </div>
+          )}
 
           <div>
             <p className="text-sm font-medium text-muted-foreground">Registrado em</p>

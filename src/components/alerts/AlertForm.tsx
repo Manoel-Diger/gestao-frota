@@ -33,12 +33,10 @@ import { useVeiculos } from "@/hooks/useVeiculos";
 import { useMotoristas } from "@/hooks/useMotoristas";
 import { Plus } from "lucide-react";
 
-// --- Manutenção 1: Removi .optional() dos campos de string para lidar com a seleção ---
 const alertSchema = z.object({
   tipo_alerta: z.enum(["Manutenção Vencida", "CNH Vencendo", "Combustível Baixo", "Comportamento"]),
-  // Usamos strings para os campos que aceitam seleção (incluindo o valor "NONE_...")
-  veiculo: z.string(),
-  motorista: z.string(),
+  veiculo: z.string().optional(),
+  motorista: z.string().optional(),
   prioridade: z.enum(["Baixa", "Média", "Alta"]),
   descricao: z.string().min(5, "Descrição é obrigatória"),
   ativo: z.enum(["Sim", "Não"]),
@@ -54,7 +52,6 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  // Seus hooks de dados não precisam de manutenção.
   const { veiculos } = useVeiculos();
   const { motoristas } = useMotoristas();
 
@@ -62,9 +59,8 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
     resolver: zodResolver(alertSchema),
     defaultValues: {
       tipo_alerta: "Manutenção Vencida",
-      // --- Manutenção 2: Use um valor não-vazio para representar 'nenhum' ---
-      veiculo: "NONE_VEICULO", // Valor de placeholder para opcional
-      motorista: "NONE_MOTORISTA", // Valor de placeholder para opcional
+      veiculo: "",
+      motorista: "",
       prioridade: "Média",
       descricao: "",
       ativo: "Sim",
@@ -74,17 +70,13 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
   const onSubmit = async (data: AlertFormData) => {
     try {
       setLoading(true);
-
-      // --- Manutenção 3: Converta o valor de placeholder de volta para 'null' para o Supabase ---
-      const veiculoValue = data.veiculo === "NONE_VEICULO" ? null : data.veiculo;
-      const motoristaValue = data.motorista === "NONE_MOTORISTA" ? null : data.motorista;
-
+      
       const { error } = await (supabase as any)
         .from('Alertas')
         .insert({
           tipo_alerta: data.tipo_alerta,
-          veiculo: veiculoValue,
-          motorista: motoristaValue,
+          veiculo: data.veiculo || null,
+          motorista: data.motorista || null,
           prioridade: data.prioridade,
           descricao: data.descricao,
           ativo: data.ativo === "Sim",
@@ -126,7 +118,7 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
             Configure um novo alerta para monitoramento da frota.
           </DialogDescription>
         </DialogHeader>
-
+        
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 gap-4">
@@ -149,8 +141,8 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
                           <SelectItem value="Combustível Baixo">Combustível Baixo</SelectItem>
                           <SelectItem value="Comportamento">Comportamento</SelectItem>
                         </SelectContent>
-                        <FormMessage />
                       </Select>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -172,8 +164,8 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
                           <SelectItem value="Média">Média</SelectItem>
                           <SelectItem value="Alta">Alta</SelectItem>
                         </SelectContent>
-                        <FormMessage />
                       </Select>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -186,25 +178,22 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Veículo (Opcional)</FormLabel>
-                      {/* --- Manutenção 4: Tratamento de valor nulo/indefinido para o `Select` --- */}
-                      <Select onValueChange={field.onChange} value={field.value ?? "NONE_VEICULO"}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione um veículo" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {/* --- Manutenção 5: O value não pode ser uma string vazia! --- */}
-                          <SelectItem value="NONE_VEICULO">Nenhum</SelectItem> 
-                          {veiculos.map((veiculo) => (
-                            // Certifica-se de que veiculo.placa não é null/undefined antes de usar.
-                            <SelectItem key={veiculo.id} value={veiculo.placa || 'PLACA_VAZIA'}>
-                              {veiculo.placa || 'Sem Placa'} - {veiculo.marca} {veiculo.modelo}
+                          <SelectItem value="none">Nenhum</SelectItem>
+                          {veiculos.filter(v => v.placa).map((veiculo) => (
+                            <SelectItem key={veiculo.id} value={veiculo.placa}>
+                              {veiculo.placa} - {veiculo.marca} {veiculo.modelo}
                             </SelectItem>
                           ))}
                         </SelectContent>
-                        <FormMessage />
                       </Select>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -215,25 +204,22 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Motorista (Opcional)</FormLabel>
-                      {/* --- Manutenção 4: Tratamento de valor nulo/indefinido para o `Select` --- */}
-                      <Select onValueChange={field.onChange} value={field.value ?? "NONE_MOTORISTA"}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Selecione um motorista" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {/* --- Manutenção 5: O value não pode ser uma string vazia! --- */}
-                          <SelectItem value="NONE_MOTORISTA">Nenhum</SelectItem> 
-                          {motoristas.map((motorista) => (
-                            // Certifica-se de que motorista.nome não é null/undefined antes de usar.
-                            <SelectItem key={motorista.id} value={motorista.nome || 'NOME_VAZIO'}>
-                              {motorista.nome || 'Sem Nome'}
+                          <SelectItem value="none">Nenhum</SelectItem>
+                          {motoristas.filter(m => m.nome).map((motorista) => (
+                            <SelectItem key={motorista.id} value={motorista.nome}>
+                              {motorista.nome}
                             </SelectItem>
                           ))}
                         </SelectContent>
-                        <FormMessage />
                       </Select>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -246,7 +232,7 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
                   <FormItem>
                     <FormLabel>Descrição</FormLabel>
                     <FormControl>
-                      <Textarea
+                      <Textarea 
                         placeholder="Descreva as condições do alerta..."
                         className="resize-none"
                         {...field}
@@ -273,17 +259,17 @@ export function AlertForm({ onSuccess }: AlertFormProps) {
                         <SelectItem value="Sim">Ativo</SelectItem>
                         <SelectItem value="Não">Inativo</SelectItem>
                       </SelectContent>
-                      <FormMessage />
                     </Select>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
 
             <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
+              <Button 
+                type="button" 
+                variant="outline" 
                 onClick={() => setOpen(false)}
                 disabled={loading}
                 className="w-full sm:w-auto"

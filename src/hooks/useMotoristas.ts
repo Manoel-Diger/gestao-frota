@@ -1,49 +1,47 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../integrations/supabase/client';
-import { Tables } from '../integrations/supabase/types';
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
-type Motorista = Tables<'Motoristas'>;
+export type Motorista = {
+  id: number;
+  created_at: string;
+  nome: string;
+  email: string | null;
+  telefone: string | null;
+  status: string | null;
+  categoria_cnh: string | null;
+  validade_cnh: string | null;
+  placa: string | null;
+};
 
 export function useMotoristas() {
   const [motoristas, setMotoristas] = useState<Motorista[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchMotoristas() {
-      try {
-        setLoading(true);
-        // O select('*') já busca a coluna 'placa' se ela existir na tabela
-        const { data, error } = await supabase
-          .from('Motoristas')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        setMotoristas(data as Motorista[] || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erro ao carregar motoristas');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchMotoristas();
-  }, []);
-
-  const refreshMotoristas = async () => {
+  const fetchMotoristas = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      setLoading(true);
+      const { data, error } = await (supabase as any)
         .from('Motoristas')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setMotoristas(data as Motorista[] || []);
+      setMotoristas((data as Motorista[]) || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao atualizar motoristas');
+      setError(err instanceof Error ? err.message : 'Erro ao carregar motoristas');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
-  return { motoristas, loading, error, refreshMotoristas };
+  useEffect(() => {
+    fetchMotoristas();
+  }, [fetchMotoristas]);
+
+  const refreshMotoristas = useCallback(async () => {
+    await fetchMotoristas();
+  }, [fetchMotoristas]);
+
+  return { motoristas, loading, error, refreshMotoristas, refetch: refreshMotoristas };
 }
