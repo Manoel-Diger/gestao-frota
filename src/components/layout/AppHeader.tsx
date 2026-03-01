@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Bell, Search, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,14 +17,17 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 
 type Alert = {
-  id: number; // corrigido
+  id: number;
   tipo_alerta: string;
   descricao: string;
   created_at: string;
 };
 
 export function AppHeader() {
+  const navigate = useNavigate();
+
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [search, setSearch] = useState("");
 
   const fetchAlerts = async () => {
     const { data, error } = await supabase
@@ -56,6 +60,13 @@ export function AppHeader() {
     };
   }, []);
 
+  // 🔎 Função de navegação da busca
+  const handleSearch = () => {
+    if (search.trim() !== "") {
+      navigate(`/vehicles?search=${encodeURIComponent(search.trim())}`);
+    }
+  };
+
   return (
     <header className="h-16 bg-fleet-header border-b border-border flex items-center justify-between px-6 shadow-sm">
       <div className="flex items-center gap-4">
@@ -65,6 +76,13 @@ export function AppHeader() {
           <Input
             placeholder="Buscar veículos, motoristas..."
             className="pl-10 w-full md:w-96"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                handleSearch();
+              }
+            }}
           />
         </div>
       </div>
