@@ -41,9 +41,10 @@ export function verificarCNHVencendo(motoristas: any[], diasAntecedencia = 30): 
   dataLimite.setDate(hoje.getDate() + diasAntecedencia);
 
   return motoristas.filter(motorista => {
-    if (!motorista.cnh_validade) return false;
+    const validade = motorista.validade_cnh || motorista.cnh_validade;
+    if (!validade) return false;
     
-    const dataVencimento = new Date(motorista.cnh_validade);
+    const dataVencimento = new Date(validade);
     return dataVencimento <= dataLimite && dataVencimento >= hoje;
   });
 }

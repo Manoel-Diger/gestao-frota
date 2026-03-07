@@ -1,6 +1,9 @@
-import { Car, Users, Wrench, Fuel, TrendingUp, AlertTriangle, Activity, ClipboardCheck, Download } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Car, Users, Wrench, Fuel, TrendingUp, AlertTriangle, Activity, ClipboardCheck, Download, DollarSign, Gauge, Shield } from "lucide-react";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { RecentActivity } from "@/components/dashboard/RecentActivity";
+import { MonthlyComparisonChart } from "@/components/dashboard/MonthlyComparisonChart";
+import { PeriodFilter, Period, filterByPeriod } from "@/components/dashboard/PeriodFilter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,9 +13,9 @@ import { useManutencoes } from "@/hooks/useManutencoes";
 import { useAbastecimentos } from "@/hooks/useAbastecimentos";
 import { useAlertas } from "@/hooks/useAlertas";
 import { useChecklists } from "@/hooks/useChecklists";
-import { calcularConsumoMedio, verificarCNHVencendo, calcularDiasParaVencimento } from "@/utils/calculations";
+import { useSmartAlerts } from "@/hooks/useSmartAlerts";
+import { calcularConsumoMedio } from "@/utils/calculations";
 import { exportToPDF, buildHTMLTable, buildSummaryCards } from "@/utils/exportUtils";
-import { useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { StaggerContainer, StaggerItem, FadeIn } from "@/components/layout/PageTransition";
 import { SkeletonCard } from "@/components/ui/skeleton-card";
@@ -24,24 +27,43 @@ export default function Dashboard() {
   const { abastecimentos, loading: loadingA } = useAbastecimentos();
   const { alertas } = useAlertas();
   const { checklists } = useChecklists();
+  const [period, setPeriod] = useState<Period>('30d');
 
   const isLoading = loadingV || loadingM || loadingMa || loadingA;
 
+  const { alerts: smartAlerts, contagem } = useSmartAlerts({
+    motoristas, manutencoes, abastecimentos, veiculos, checklists,
+  });
+
+  // Filtered data by period
+  const filteredAbastecimentos = useMemo(() => filterByPeriod(abastecimentos, period, 'data'), [abastecimentos, period]);
+  const filteredManutencoes = useMemo(() => filterByPeriod(manutencoes, period, 'data'), [manutencoes, period]);
+
   const totalVeiculos = veiculos.length;
   const motoristasAtivos = motoristas.filter(m => m.status === "Ativo").length;
-  const manutencoesPendentes = manutencoes.filter(m => {
-    if (!m.data) return true;
-    return new Date(m.data) > new Date();
+  const manutencoesPendentes = filteredManutencoes.filter(m => {
+    const status = (m.status || '').toLowerCase();
+    return status !== 'concluída' && status !== 'concluida' && status !== 'finalizada' && status !== 'cancelada';
   }).length;
   
   const consumoMedio = useMemo(() => {
-    const consumo = calcularConsumoMedio(abastecimentos);
+    const consumo = calcularConsumoMedio(filteredAbastecimentos);
     return consumo > 0 ? consumo.toFixed(1) : "0";
-  }, [abastecimentos]);
+  }, [filteredAbastecimentos]);
 
-  const cnhsVencendo = useMemo(() => {
-    return verificarCNHVencendo(motoristas, 30);
-  }, [motoristas]);
+  // Custo total no período
+  const custoTotal = useMemo(() => {
+    const custoCombustivel = filteredAbastecimentos.reduce((sum, a) => sum + (Number(a.custo_total) || 0), 0);
+    const custoManutencao = filteredManutencoes.reduce((sum, m) => sum + (Number(m.custo) || 0), 0);
+    return { combustivel: custoCombustivel, manutencao: custoManutencao, total: custoCombustivel + custoManutencao };
+  }, [filteredAbastecimentos, filteredManutencoes]);
+
+  // CPK (Custo por KM)
+  const custoPorKm = useMemo(() => {
+    const totalKm = filteredAbastecimentos.reduce((sum, a) => sum + (Number(a.quilometragem) || 0), 0);
+    if (totalKm === 0 || custoTotal.total === 0) return '—';
+    return `R$ ${(custoTotal.total / totalKm).toFixed(2)}`;
+  }, [filteredAbastecimentos, custoTotal]);
 
   const checklistStats = useMemo(() => {
     const total = checklists.length;
@@ -52,7 +74,7 @@ export default function Dashboard() {
   }, [checklists]);
 
   const chartData = useMemo(() => {
-    const manutencoesPorTipo = manutencoes.reduce((acc, m) => {
+    const manutencoesPorTipo = filteredManutencoes.reduce((acc, m) => {
       const tipo = m.tipo_manutencao || 'Outros';
       acc[tipo] = (acc[tipo] || 0) + 1;
       return acc;
@@ -66,7 +88,7 @@ export default function Dashboard() {
     }, {} as Record<string, number>);
     const statusChart = Object.entries(veiculosPorStatus).map(([name, value]) => ({ name, value }));
 
-    const consumoPorVeiculo = abastecimentos.reduce((acc, a) => {
+    const consumoPorVeiculo = filteredAbastecimentos.reduce((acc, a) => {
       if (a.veiculo_placa) {
         if (!acc[a.veiculo_placa]) acc[a.veiculo_placa] = { litros: 0, custo: 0 };
         acc[a.veiculo_placa].litros += a.litros || 0;
@@ -78,46 +100,24 @@ export default function Dashboard() {
       .map(([placa, data]) => ({ placa, litros: data.litros, custo: data.custo }))
       .sort((a, b) => b.litros - a.litros).slice(0, 5);
 
-    const alertasAtivos = alertas.filter(a => a.ativo);
-    const alertasPorPrioridade = alertasAtivos.reduce((acc, a) => {
-      const prioridade = a.prioridade || 'Normal';
-      acc[prioridade] = (acc[prioridade] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    const alertasChart = Object.entries(alertasPorPrioridade).map(([name, value]) => ({ name, value }));
-
     const checklistChart = [
       { name: 'Aprovados', value: checklistStats.aprovados },
       { name: 'Reprovados', value: checklistStats.reprovados },
     ].filter(d => d.value > 0);
 
-    return { manutencaoChart, statusChart, consumoChart, alertasChart, checklistChart };
-  }, [manutencoes, veiculos, abastecimentos, alertas, checklistStats]);
+    return { manutencaoChart, statusChart, consumoChart, checklistChart };
+  }, [filteredManutencoes, veiculos, filteredAbastecimentos, checklistStats]);
 
   const COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--destructive))', 'hsl(var(--muted))'];
-
-  const alertasDinamicos = useMemo(() => {
-    const alerts: any[] = [];
-    manutencoes.filter(m => m.data && new Date(m.data) < new Date()).forEach(m => {
-      alerts.push({ id: `manutencao-${m.id}`, tipo: 'Manutenção Vencida', descricao: `${m.veiculo_placa || 'Veículo'} - ${m.tipo_manutencao || 'Manutenção'}`, prioridade: 'Urgente', variant: 'warning' as const });
-    });
-    veiculos.filter(v => v.combustivel_atual !== null && v.combustivel_atual < 20).forEach(v => {
-      alerts.push({ id: `combustivel-${v.id}`, tipo: 'Combustível Baixo', descricao: `${v.placa} - ${v.combustivel_atual}% restante`, prioridade: 'Atenção', variant: 'default' as const });
-    });
-    checklists.filter(c => c.status_final === 'Reprovado').slice(0, 3).forEach(c => {
-      alerts.push({ id: `checklist-${c.id}`, tipo: 'Checklist Reprovado', descricao: `${c.placa_veiculo} - ${c.total_nao_conformidades} falha(s)`, prioridade: 'Alta', variant: 'warning' as const });
-    });
-    return alerts.slice(0, 6);
-  }, [manutencoes, veiculos, checklists]);
 
   const handleExportDashboard = () => {
     const summary = buildSummaryCards([
       { label: 'Total de Veículos', value: totalVeiculos },
       { label: 'Motoristas Ativos', value: motoristasAtivos },
       { label: 'Manutenções Pendentes', value: manutencoesPendentes },
-      { label: 'Consumo Médio (L)', value: consumoMedio },
+      { label: 'Consumo Médio (km/L)', value: consumoMedio },
+      { label: 'Custo Total', value: `R$ ${custoTotal.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` },
       { label: 'Saúde da Frota', value: `${checklistStats.saudePct}%` },
-      { label: 'Checklists Realizados', value: checklistStats.total },
     ]);
 
     const veiculosTable = buildHTMLTable(
@@ -137,8 +137,17 @@ export default function Dashboard() {
       { placa: 'Veículo', tipo: 'Tipo', data: 'Data', custo: 'Custo', status: 'Status' }
     );
 
+    const alertasTable = smartAlerts.length > 0 ? buildHTMLTable(
+      smartAlerts.slice(0, 10).map(a => ({
+        tipo: a.tipo, descricao: a.descricao, prioridade: a.prioridade,
+      })),
+      { tipo: 'Tipo', descricao: 'Descrição', prioridade: 'Prioridade' }
+    ) : '<p style="color:#888;">Nenhum alerta ativo.</p>';
+
     const content = `
       ${summary}
+      <h2 class="section-title">Alertas Inteligentes</h2>
+      ${alertasTable}
       <h2 class="section-title">Frota de Veículos</h2>
       ${veiculosTable}
       <h2 class="section-title">Manutenções Recentes</h2>
@@ -151,6 +160,15 @@ export default function Dashboard() {
     });
   };
 
+  const getPrioridadeStyle = (p: string) => {
+    switch (p) {
+      case 'Crítica': return 'bg-destructive/10 text-destructive border-destructive/30';
+      case 'Alta': return 'bg-warning/10 text-warning border-warning/30';
+      case 'Média': return 'bg-primary/10 text-primary border-primary/30';
+      default: return 'bg-muted text-muted-foreground border-border';
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -158,37 +176,65 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold text-foreground tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground">Visão geral da sua frota</p>
         </div>
-        <Button onClick={handleExportDashboard} className="bg-gradient-primary hover:opacity-90 transition-opacity">
-          <Download className="mr-2 h-4 w-4" />
-          Exportar Relatório
-        </Button>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <PeriodFilter selected={period} onChange={setPeriod} />
+          <Button onClick={handleExportDashboard} className="bg-gradient-primary hover:opacity-90 transition-opacity">
+            <Download className="mr-2 h-4 w-4" />
+            Exportar PDF
+          </Button>
+        </div>
       </div>
 
+      {/* Smart Alerts Banner */}
+      {contagem.total > 0 && (
+        <FadeIn>
+          <div className="flex items-center gap-3 p-3 rounded-lg border border-warning/30 bg-warning/5">
+            <Shield className="h-5 w-5 text-warning flex-shrink-0" />
+            <span className="text-sm font-medium">
+              {contagem.total} alerta(s) inteligente(s) detectados
+            </span>
+            <div className="flex gap-2 ml-auto">
+              {contagem.critica > 0 && <Badge className="bg-destructive/10 text-destructive border-destructive/30">{contagem.critica} crítico(s)</Badge>}
+              {contagem.alta > 0 && <Badge className="bg-warning/10 text-warning border-warning/30">{contagem.alta} alto(s)</Badge>}
+              {contagem.media > 0 && <Badge className="bg-primary/10 text-primary border-primary/30">{contagem.media} médio(s)</Badge>}
+            </div>
+          </div>
+        </FadeIn>
+      )}
+
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : (
         <StaggerContainer>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <StaggerItem>
-              <StatsCard title="Total de Veículos" value={totalVeiculos.toString()} icon={<Car className="h-5 w-5" />} trend={{ value: `${veiculos.filter(v => v.status === 'Ativo').length} ativos`, isPositive: true }} />
+              <StatsCard title="Veículos" value={totalVeiculos.toString()} icon={<Car className="h-5 w-5" />} trend={{ value: `${veiculos.filter(v => v.status === 'Ativo' || v.status === 'Disponível').length} ativos`, isPositive: true }} />
             </StaggerItem>
             <StaggerItem>
-              <StatsCard title="Motoristas Ativos" value={motoristasAtivos.toString()} icon={<Users className="h-5 w-5" />} trend={{ value: `${motoristas.length} total`, isPositive: true }} />
+              <StatsCard title="Motoristas" value={motoristasAtivos.toString()} icon={<Users className="h-5 w-5" />} trend={{ value: `${motoristas.length} total`, isPositive: true }} />
             </StaggerItem>
             <StaggerItem>
-              <StatsCard title="Manutenções Pendentes" value={manutencoesPendentes.toString()} icon={<Wrench className="h-5 w-5" />} trend={{ value: `${manutencoes.length} total`, isPositive: manutencoesPendentes === 0 }} />
+              <StatsCard title="Manutenções" value={manutencoesPendentes.toString()} icon={<Wrench className="h-5 w-5" />} trend={{ value: 'pendentes', isPositive: manutencoesPendentes === 0 }} />
             </StaggerItem>
             <StaggerItem>
-              <StatsCard title="Consumo Médio" value={`${consumoMedio}L`} icon={<Fuel className="h-5 w-5" />} trend={{ value: `${abastecimentos.length} abastec.`, isPositive: true }} />
+              <StatsCard title="Consumo Médio" value={`${consumoMedio} km/L`} icon={<Gauge className="h-5 w-5" />} trend={{ value: `${filteredAbastecimentos.length} abast.`, isPositive: true }} />
             </StaggerItem>
             <StaggerItem>
-              <StatsCard title="Saúde da Frota" value={`${checklistStats.saudePct}%`} icon={<ClipboardCheck className="h-5 w-5" />} trend={{ value: `${checklistStats.total} inspeções`, isPositive: checklistStats.saudePct >= 80 }} />
+              <StatsCard title="Custo Total" value={`R$ ${(custoTotal.total / 1000).toFixed(1)}k`} icon={<DollarSign className="h-5 w-5" />} trend={{ value: custoPorKm !== '—' ? `CPK: ${custoPorKm}` : 'Sem dados', isPositive: true }} />
+            </StaggerItem>
+            <StaggerItem>
+              <StatsCard title="Saúde Frota" value={`${checklistStats.saudePct}%`} icon={<ClipboardCheck className="h-5 w-5" />} trend={{ value: `${checklistStats.total} inspeções`, isPositive: checklistStats.saudePct >= 80 }} />
             </StaggerItem>
           </div>
         </StaggerContainer>
       )}
+
+      {/* Monthly Comparison - full width */}
+      <FadeIn delay={0.2}>
+        <MonthlyComparisonChart abastecimentos={abastecimentos} manutencoes={manutencoes} />
+      </FadeIn>
 
       <FadeIn delay={0.3}>
         <div className="grid gap-6 lg:grid-cols-2">
@@ -203,13 +249,13 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={chartData.manutencaoChart}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
                     <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
                     <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '13px' }} />
-                    <Bar dataKey="total" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]}>
+                    <Bar dataKey="total" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]}>
                       {chartData.manutencaoChart.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
@@ -231,7 +277,7 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
                     <Pie data={chartData.statusChart} cx="50%" cy="50%" labelLine={false} label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`} outerRadius={90} innerRadius={50} fill="hsl(var(--primary))" dataKey="value">
                       {chartData.statusChart.map((_, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
@@ -255,7 +301,7 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
                     <Pie data={chartData.checklistChart} cx="50%" cy="50%" labelLine={false} label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`} outerRadius={90} innerRadius={50} dataKey="value">
                       <Cell fill="hsl(var(--success))" />
@@ -280,7 +326,7 @@ export default function Dashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={280}>
                   <LineChart data={chartData.consumoChart}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="placa" stroke="hsl(var(--muted-foreground))" fontSize={12} />
@@ -304,6 +350,7 @@ export default function Dashboard() {
             <RecentActivity />
           </div>
 
+          {/* Smart Alerts Panel */}
           <div className="space-y-4">
             <Card className="border-border/50">
               <CardHeader>
@@ -311,38 +358,31 @@ export default function Dashboard() {
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-warning/10">
                     <AlertTriangle className="h-4 w-4 text-warning" />
                   </div>
-                  Alertas Importantes
+                  Alertas Inteligentes
+                  {contagem.total > 0 && (
+                    <Badge variant="secondary" className="ml-auto">{contagem.total}</Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {cnhsVencendo.map((motorista) => {
-                  const dias = calcularDiasParaVencimento(motorista.cnh_validade);
-                  return (
-                    <div key={motorista.id} className="p-3 border border-destructive/20 bg-destructive/5 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium text-sm">CNH Vencendo</p>
-                        <Badge variant="destructive">{dias} dias</Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">{motorista.nome} - Categoria {motorista.categoria_cnh}</p>
-                    </div>
-                  );
-                })}
-                {alertasDinamicos.map((alerta) => (
-                  <div key={alerta.id} className={`p-3 border rounded-lg ${alerta.variant === 'warning' ? 'border-warning/20 bg-warning/5' : 'border-primary/20 bg-primary/5'}`}>
+                {smartAlerts.slice(0, 6).map((alerta) => (
+                  <div key={alerta.id} className={`p-3 border rounded-lg ${getPrioridadeStyle(alerta.prioridade)}`}>
                     <div className="flex items-center justify-between">
                       <p className="font-medium text-sm">{alerta.tipo}</p>
-                      <Badge variant={alerta.variant === 'warning' ? 'outline' : 'default'} className={alerta.variant === 'warning' ? 'text-warning border-warning' : ''}>{alerta.prioridade}</Badge>
+                      <Badge variant="outline" className={getPrioridadeStyle(alerta.prioridade)}>
+                        {alerta.prioridade}
+                      </Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">{alerta.descricao}</p>
+                    <p className="text-sm mt-1 opacity-80">{alerta.descricao}</p>
                   </div>
                 ))}
-                {cnhsVencendo.length === 0 && alertasDinamicos.length === 0 && (
+                {smartAlerts.length === 0 && (
                   <div className="p-3 border border-success/20 bg-success/5 rounded-lg">
                     <div className="flex items-center justify-between">
-                      <p className="font-medium text-sm">Tudo OK</p>
+                      <p className="font-medium text-sm text-success">Tudo em ordem!</p>
                       <Badge className="bg-success/10 text-success border-success">OK</Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">Nenhum alerta ativo no momento</p>
+                    <p className="text-sm text-muted-foreground mt-1">Nenhum alerta detectado no momento</p>
                   </div>
                 )}
               </CardContent>
