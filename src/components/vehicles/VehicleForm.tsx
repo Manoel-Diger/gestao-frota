@@ -117,6 +117,25 @@ export function VehicleForm({ onSuccess }: VehicleFormProps) {
     try {
       setLoading(true);
 
+      // --- NOVA LÓGICA DE VALIDAÇÃO DE PLACA DUPLICADA ---
+      const { data: existingVehicle, error: checkError } = await supabase
+        .from("Veiculos")
+        .select("placa")
+        .eq("placa", data.placa.toUpperCase())
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+
+      if (existingVehicle) {
+        form.setError("placa", {
+          type: "manual",
+          message: "Esta placa já está cadastrada no sistema.",
+        });
+        setLoading(false);
+        return; // Interrompe o cadastro
+      }
+      // --------------------------------------------------
+
       const { error } = await supabase.from("Veiculos").insert([
         {
           placa: data.placa.toUpperCase(),

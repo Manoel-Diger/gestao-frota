@@ -104,6 +104,31 @@ export function ChecklistForm({ onSubmit, initialData, isLoading }: ChecklistFor
     },
   });
 
+  // --- LÓGICA DE AUTOMAÇÃO (MOTORISTA + ODÔMETRO) ---
+  const watchedPlaca = form.watch("placa_veiculo");
+
+  useEffect(() => {
+    if (watchedPlaca && veiculos.length > 0) {
+      const veiculoSelecionado = veiculos.find(v => v.placa === watchedPlaca);
+      
+      if (veiculoSelecionado) {
+        // Automação do Motorista
+        if (veiculoSelecionado.motorista_id) {
+          const motoristaExiste = motoristas.some(m => m.id === veiculoSelecionado.motorista_id);
+          if (motoristaExiste) {
+            form.setValue("motorista", veiculoSelecionado.motorista_id);
+          }
+        }
+        
+        // Automação do Odômetro (KM atual do veículo)
+        if (veiculoSelecionado.quilometragem !== undefined) {
+          form.setValue("odometro", veiculoSelecionado.quilometragem);
+        }
+      }
+    }
+  }, [watchedPlaca, veiculos, motoristas, form]);
+  // --------------------------------------------------
+
   const updateItem = (groupKey: string, itemName: string, field: 'status' | 'obs', value: string) => {
     setInspectionData(prev => ({
       ...prev,
@@ -145,7 +170,6 @@ export function ChecklistForm({ onSubmit, initialData, isLoading }: ChecklistFor
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-        {/* Dynamic Counters */}
         <div className="grid grid-cols-3 gap-3">
           <Card className="border-success/30 bg-success/5 transition-all duration-500">
             <CardContent className="p-4 flex items-center gap-3">
@@ -176,7 +200,6 @@ export function ChecklistForm({ onSubmit, initialData, isLoading }: ChecklistFor
           </Card>
         </div>
 
-        {/* Basic Fields */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField control={form.control} name="data_inspecao" render={({ field }) => (
             <FormItem>
@@ -262,7 +285,6 @@ export function ChecklistForm({ onSubmit, initialData, isLoading }: ChecklistFor
           )} />
         </div>
 
-        {/* Inspection Groups */}
         {Object.entries(INSPECTION_GROUPS).map(([groupKey, group]) => (
           <Card key={groupKey}>
             <CardHeader className="pb-3">
@@ -302,11 +324,11 @@ export function ChecklistForm({ onSubmit, initialData, isLoading }: ChecklistFor
                       </div>
                     </RadioGroup>
                     {item.status === 'nok' && (
-                      <Input
+                      <input
                         placeholder="Observação..."
                         value={item.obs || ''}
                         onChange={(e) => updateItem(groupKey, itemName, 'obs', e.target.value)}
-                        className="flex-1 h-8 text-xs"
+                        className="flex-1 h-8 text-xs border rounded px-2"
                       />
                     )}
                   </div>
@@ -316,7 +338,6 @@ export function ChecklistForm({ onSubmit, initialData, isLoading }: ChecklistFor
           </Card>
         ))}
 
-        {/* Checkboxes */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField control={form.control} name="assinatura_motorista" render={({ field }) => (
             <FormItem className="flex items-center space-x-2 space-y-0">
@@ -336,7 +357,6 @@ export function ChecklistForm({ onSubmit, initialData, isLoading }: ChecklistFor
           )} />
         </div>
 
-        {/* Images */}
         <div>
           <FormLabel>Imagens</FormLabel>
           <div className="mt-2">

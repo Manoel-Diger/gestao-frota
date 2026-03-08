@@ -41,6 +41,7 @@ const vehicleSchema = z.object({
   proxima_manutencao: z.string().optional(),
   localizacao: z.string().optional(),
   combustivel_atual: z.number().min(0, "Nível de combustível deve ser entre 0 e 100").max(100, "Nível de combustível deve ser entre 0 e 100"),
+  motorista_id: z.string().optional(),
 });
 
 type VehicleFormData = z.infer<typeof vehicleSchema>;
@@ -54,6 +55,7 @@ interface VehicleEditDialogProps {
 
 export function VehicleEditDialog({ veiculo, open, onOpenChange, onSuccess }: VehicleEditDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [motoristas, setMotoristas] = useState<{ id: number; nome: string }[]>([]);
   const { toast } = useToast();
 
   const form = useForm<VehicleFormData>({
@@ -69,8 +71,25 @@ export function VehicleEditDialog({ veiculo, open, onOpenChange, onSuccess }: Ve
       proxima_manutencao: "",
       localizacao: "",
       combustivel_atual: 100,
+      motorista_id: "none",
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      const fetchMotoristas = async () => {
+        const { data, error } = await supabase
+          .from("Motoristas")
+          .select("id, nome")
+          .order("nome", { ascending: true });
+
+        if (!error && data) {
+          setMotoristas(data);
+        }
+      };
+      fetchMotoristas();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (veiculo) {
@@ -85,6 +104,7 @@ export function VehicleEditDialog({ veiculo, open, onOpenChange, onSuccess }: Ve
         proxima_manutencao: veiculo.proxima_manutencao || "",
         localizacao: veiculo.localizacao || "",
         combustivel_atual: Number(veiculo.combustivel_atual) || 100,
+        motorista_id: veiculo.motorista_id ? String(veiculo.motorista_id) : "none",
       });
     }
   }, [veiculo, form]);
@@ -94,6 +114,25 @@ export function VehicleEditDialog({ veiculo, open, onOpenChange, onSuccess }: Ve
     
     try {
       setLoading(true);
+
+      // Validação de placa duplicada (ignorando o veículo atual)
+      const { data: existingVehicle, error: checkError } = await supabase
+        .from("Veiculos")
+        .select("id")
+        .eq("placa", data.placa.toUpperCase())
+        .neq("id", veiculo.id)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+
+      if (existingVehicle) {
+        form.setError("placa", {
+          type: "manual",
+          message: "Esta placa já está cadastrada em outro veículo.",
+        });
+        setLoading(false);
+        return;
+      }
 
       const { error } = await (supabase as any)
         .from('Veiculos')
@@ -108,6 +147,7 @@ export function VehicleEditDialog({ veiculo, open, onOpenChange, onSuccess }: Ve
           proxima_manutencao: data.proxima_manutencao || null,
           localizacao: data.localizacao || null,
           combustivel_atual: data.combustivel_atual,
+          motorista_id: data.motorista_id && data.motorista_id !== "none" ? Number(data.motorista_id) : null,
         })
         .eq('id', veiculo.id);
 
@@ -227,6 +267,32 @@ export function VehicleEditDialog({ veiculo, open, onOpenChange, onSuccess }: Ve
                         <SelectItem value="Inativo">Inativo</SelectItem>
                         <SelectItem value="Em uso">Em uso</SelectItem>
                         <SelectItem value="Disponível">Disponível</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="motorista_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Motorista</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um motorista" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Sem motorista</SelectItem>
+                        {motoristas.map((m) => (
+                          <SelectItem key={m.id} value={String(m.id)}>
+                            {m.nome}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
