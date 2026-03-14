@@ -259,7 +259,8 @@ export default function FuelPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Placa</TableHead>
-                    <TableHead>Data</TableHead>
+                     <TableHead>Motorista</TableHead>
+                     <TableHead>Data</TableHead>
                     <TableHead className="text-right">Litros</TableHead>
                     <TableHead className="text-right">Km</TableHead>
                     <TableHead className="text-right">Valor Total</TableHead>
@@ -277,6 +278,9 @@ export default function FuelPage() {
                       <TableRow key={abastecimento.id.toString()}>
                         <TableCell className="font-medium">
                           {abastecimento.veiculo_placa || "N/A"}
+                        </TableCell>
+                        <TableCell>
+                          {abastecimento.motorista_nome || "N/A"}
                         </TableCell>
                         <TableCell>
                           {abastecimento.data

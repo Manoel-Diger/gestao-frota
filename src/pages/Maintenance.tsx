@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Wrench, DollarSign, TrendingUp, Calendar, Search, Eye, Pencil, Trash2, CheckCircle } from "lucide-react";
 import { MaintenanceForm } from "@/components/maintenance/MaintenanceForm";
+import { MaintenanceEditDialog } from "@/components/maintenance/MaintenanceEditDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,11 +14,35 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useManutencoes } from "@/hooks/useManutencoes";
+import { useManutencoes, Manutencao } from "@/hooks/useManutencoes";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Maintenance() {
-  const { manutencoes, loading, error, refetch } = useManutencoes();
+  const { manutencoes, loading, error, refetch, deleteManutencao } = useManutencoes();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [editManutencao, setEditManutencao] = useState<Manutencao | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+
+  // Mapa placa -> motorista (do veículo)
+  const [motoristaMap, setMotoristaMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchVeiculos = async () => {
+      const { data } = await (supabase as any)
+        .from('Veiculos')
+        .select('placa, motorista');
+      if (data) {
+        const map: Record<string, string> = {};
+        data.forEach((v: any) => {
+          if (v.placa) map[v.placa] = v.motorista || 'Não definido';
+        });
+        setMotoristaMap(map);
+      }
+    };
+    fetchVeiculos();
+  }, [manutencoes]);
 
   // Filtragem com useMemo
   const filteredManutencoes = useMemo(() => {
@@ -30,11 +55,13 @@ export default function Maintenance() {
         ? new Date(manutencao.data).toLocaleDateString("pt-BR")
         : "";
       const tipo = manutencao.tipo_manutencao?.toLowerCase() || "";
+      const motorista = (motoristaMap[manutencao.veiculo_placa || ""] || "").toLowerCase();
       return placaVeiculo.includes(lowerCaseSearch) || 
              data.includes(lowerCaseSearch) || 
-             tipo.includes(lowerCaseSearch);
+             tipo.includes(lowerCaseSearch) ||
+             motorista.includes(lowerCaseSearch);
     });
-  }, [manutencoes, searchTerm]);
+  }, [manutencoes, searchTerm, motoristaMap]);
 
   // Funções helper para normalização de status
   const normalizeStatus = (status: string | null) =>
@@ -74,30 +101,36 @@ export default function Maintenance() {
   const getStatusVariant = (status: string | null) => {
     switch (statusKey(status)) {
       case "concluida":
-        return "default"; // concluída/finalizada: azul
+        return "default";
       case "cancelada":
-        return "destructive"; // cancelada: vermelho
+        return "destructive";
       case "agendada":
-        return "secondary"; // agendada: cinza/neutro
+        return "secondary";
       default:
         return "outline";
     }
   };
 
-  const handleView = (id: number) => {
-    console.log("Visualizar manutenção:", id);
-    // TODO: Implementar modal de visualização
-  };
-
-  const handleEdit = (id: number) => {
-    console.log("Editar manutenção:", id);
-    // TODO: Implementar modal de edição
+  const handleEdit = (manutencao: Manutencao) => {
+    setEditManutencao(manutencao);
+    setEditDialogOpen(true);
   };
 
   const handleDelete = async (id: number) => {
     if (confirm("Tem certeza que deseja excluir esta manutenção?")) {
-      console.log("Excluir manutenção:", id);
-      // TODO: Implementar exclusão
+      const success = await deleteManutencao(id);
+      if (success) {
+        toast({
+          title: "Sucesso!",
+          description: "Manutenção excluída com sucesso.",
+        });
+      } else {
+        toast({
+          title: "Erro",
+          description: "Falha ao excluir a manutenção.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -191,7 +224,7 @@ export default function Maintenance() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
-                placeholder="Buscar por placa, data ou tipo..."
+                placeholder="Buscar por placa, data, tipo ou motorista..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -226,6 +259,7 @@ export default function Maintenance() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Placa</TableHead>
+                    <TableHead>Motorista</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Data</TableHead>
                     <TableHead>Status</TableHead>
@@ -236,11 +270,15 @@ export default function Maintenance() {
                 <TableBody>
                   {filteredManutencoes.map((manutencao) => {
                     const custo = Number(manutencao.custo) || 0;
+                    const motorista = motoristaMap[manutencao.veiculo_placa || ""] || "N/A";
                     
                     return (
                       <TableRow key={manutencao.id.toString()}>
                         <TableCell className="font-medium">
                           {manutencao.veiculo_placa || "N/A"}
+                        </TableCell>
+                        <TableCell>
+                          {motorista}
                         </TableCell>
                         <TableCell>
                           {manutencao.tipo_manutencao || "N/A"}
@@ -265,15 +303,7 @@ export default function Maintenance() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleView(manutencao.id)}
-                              title="Visualizar"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEdit(manutencao.id)}
+                              onClick={() => handleEdit(manutencao)}
                               title="Editar"
                             >
                               <Pencil className="h-4 w-4" />
@@ -298,6 +328,13 @@ export default function Maintenance() {
           )}
         </CardContent>
       </Card>
+
+      <MaintenanceEditDialog
+        manutencao={editManutencao}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSuccess={refetch}
+      />
     </div>
   );
 }

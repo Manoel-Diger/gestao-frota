@@ -191,7 +191,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-3 p-3 rounded-lg border border-warning/30 bg-warning/5">
             <Shield className="h-5 w-5 text-warning flex-shrink-0" />
             <span className="text-sm font-medium">
-              {contagem.total} alerta(s) inteligente(s) detectados
+              {contagem.total} alerta(s) detectado(s)
             </span>
             <div className="flex gap-2 ml-auto">
               {contagem.critica > 0 && <Badge className="bg-destructive/10 text-destructive border-destructive/30">{contagem.critica} crítico(s)</Badge>}
