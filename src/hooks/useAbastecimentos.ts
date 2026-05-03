@@ -28,6 +28,7 @@ export function useAbastecimentos() {
       const { data, error } = await (supabase as any)
         .from('Abastecimentos')
         .select('*')
+        .order('data', { ascending: false })
         .order('created_at', { ascending: false });
 
       if (error) throw error;

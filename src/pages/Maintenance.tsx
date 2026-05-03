@@ -17,11 +17,13 @@ import {
 import { useManutencoes, Manutencao } from "@/hooks/useManutencoes";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { MonthYearFilter, matchesMonthYear } from "@/components/shared/MonthYearFilter";
 
 export default function Maintenance() {
   const { manutencoes, loading, error, refetch, deleteManutencao } = useManutencoes();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [periodFilter, setPeriodFilter] = useState<string>("all");
   const [editManutencao, setEditManutencao] = useState<Manutencao | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
@@ -48,8 +50,9 @@ export default function Maintenance() {
   const filteredManutencoes = useMemo(() => {
     if (!manutencoes) return [];
     const lowerCaseSearch = searchTerm.toLowerCase().trim();
-    if (!lowerCaseSearch) return manutencoes;
     return manutencoes.filter((manutencao) => {
+      if (!matchesMonthYear(manutencao.data, periodFilter)) return false;
+      if (!lowerCaseSearch) return true;
       const placaVeiculo = manutencao.veiculo_placa?.toLowerCase() || "";
       const data = manutencao.data
         ? new Date(manutencao.data).toLocaleDateString("pt-BR")
@@ -61,7 +64,7 @@ export default function Maintenance() {
              tipo.includes(lowerCaseSearch) ||
              motorista.includes(lowerCaseSearch);
     });
-  }, [manutencoes, searchTerm, motoristaMap]);
+  }, [manutencoes, searchTerm, motoristaMap, periodFilter]);
 
   // Funções helper para normalização de status
   const normalizeStatus = (status: string | null) =>
@@ -81,7 +84,8 @@ export default function Maintenance() {
 
   // Cálculos dinâmicos por filtro
   const stats = useMemo(() => {
-    const filtered = searchTerm ? filteredManutencoes : manutencoes;
+    const hasFilter = !!searchTerm || periodFilter !== "all";
+    const filtered = hasFilter ? filteredManutencoes : manutencoes;
     const totalCusto = filtered.reduce((sum, man) => sum + (Number(man.custo) || 0), 0);
     const totalManutencoes = filtered.length;
     const custoMedio = totalManutencoes > 0 ? totalCusto / totalManutencoes : 0;
@@ -96,7 +100,7 @@ export default function Maintenance() {
       agendadas,
       concluidas,
     };
-  }, [manutencoes, filteredManutencoes, searchTerm]);
+  }, [manutencoes, filteredManutencoes, searchTerm, periodFilter]);
 
   const getStatusVariant = (status: string | null) => {
     switch (statusKey(status)) {
@@ -230,6 +234,11 @@ export default function Maintenance() {
                 className="pl-10"
               />
             </div>
+            <MonthYearFilter
+              value={periodFilter}
+              onChange={setPeriodFilter}
+              availableDates={manutencoes.map((m) => m.data)}
+            />
           </div>
         </CardHeader>
         <CardContent>

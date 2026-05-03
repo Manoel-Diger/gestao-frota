@@ -16,11 +16,13 @@ import {
 } from "@/components/ui/table";
 import { useAbastecimentos, Abastecimento } from "@/hooks/useAbastecimentos";
 import { useToast } from "@/hooks/use-toast";
+import { MonthYearFilter, matchesMonthYear } from "@/components/shared/MonthYearFilter";
 
 export default function FuelPage() {
   const { abastecimentos, loading, error, refetch, deleteAbastecimento } = useAbastecimentos();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
+  const [periodFilter, setPeriodFilter] = useState<string>("all");
   const [viewAbastecimento, setViewAbastecimento] = useState<Abastecimento | null>(null);
   const [editAbastecimento, setEditAbastecimento] = useState<Abastecimento | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -30,19 +32,21 @@ export default function FuelPage() {
   const filteredAbastecimentos = useMemo(() => {
     if (!abastecimentos) return [];
     const lowerCaseSearch = searchTerm.toLowerCase().trim();
-    if (!lowerCaseSearch) return abastecimentos;
     return abastecimentos.filter((abastecimento) => {
+      if (!matchesMonthYear(abastecimento.data, periodFilter)) return false;
+      if (!lowerCaseSearch) return true;
       const placaVeiculo = abastecimento.veiculo_placa?.toLowerCase() || "";
       const data = abastecimento.data
         ? new Date(abastecimento.data).toLocaleDateString("pt-BR")
         : "";
       return placaVeiculo.includes(lowerCaseSearch) || data.includes(lowerCaseSearch);
     });
-  }, [abastecimentos, searchTerm]);
+  }, [abastecimentos, searchTerm, periodFilter]);
 
   // Cálculos dinâmicos por filtro
   const stats = useMemo(() => {
-    const filtered = searchTerm ? filteredAbastecimentos : abastecimentos;
+    const hasFilter = !!searchTerm || periodFilter !== "all";
+    const filtered = hasFilter ? filteredAbastecimentos : abastecimentos;
     const totalGasto = filtered.reduce((sum, ab) => sum + (Number(ab.custo_total) || 0), 0);
     const totalLitros = filtered.reduce((sum, ab) => sum + (Number(ab.litros) || 0), 0);
     const totalAbastecimentos = filtered.length;
@@ -84,7 +88,7 @@ export default function FuelPage() {
     cpk = totalKmRodados > 0 ? totalCustoConsumo / totalKmRodados : 0;
 
     return { totalGasto, totalLitros, totalAbastecimentos, precoMedioGeral, consumoMedio, cpk };
-  }, [abastecimentos, filteredAbastecimentos, searchTerm]);
+  }, [abastecimentos, filteredAbastecimentos, searchTerm, periodFilter]);
 
   const handleView = (abastecimento: Abastecimento) => {
     setViewAbastecimento(abastecimento);
@@ -230,6 +234,11 @@ export default function FuelPage() {
                 className="pl-10"
               />
             </div>
+            <MonthYearFilter
+              value={periodFilter}
+              onChange={setPeriodFilter}
+              availableDates={abastecimentos.map((a) => a.data)}
+            />
           </div>
         </CardHeader>
         <CardContent>

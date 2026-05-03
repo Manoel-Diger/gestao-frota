@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Users, Search, Phone, Mail } from "lucide-react";
 import { DriverForm } from "@/components/drivers/DriverForm";
+import { DriverEditDialog } from "@/components/drivers/DriverEditDialog";
+import { DriverViewDialog } from "@/components/drivers/DriverViewDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +13,9 @@ import { useMotoristas, Motorista } from "@/hooks/useMotoristas";
 export default function Drivers() {
   const [searchTerm, setSearchTerm] = useState("");
   const { motoristas, loading, error, refreshMotoristas } = useMotoristas();
+  const [selectedDriver, setSelectedDriver] = useState<Motorista | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
 
   const filteredDrivers = motoristas.filter(motorista =>
     (motorista.nome?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
@@ -101,10 +106,26 @@ export default function Drivers() {
                   <p className="text-sm text-muted-foreground">{motorista.placa || 'Não designado'}</p>
                 </div>
                 <div className="flex gap-2 pt-2">
-                  <Button variant="outline" size="sm" className="flex-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      setSelectedDriver(motorista);
+                      setEditOpen(true);
+                    }}
+                  >
                     Editar
                   </Button>
-                  <Button variant="outline" size="sm" className="flex-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      setSelectedDriver(motorista);
+                      setViewOpen(true);
+                    }}
+                  >
                     Detalhes
                   </Button>
                 </div>
@@ -113,6 +134,18 @@ export default function Drivers() {
           ))
         )}
       </div>
+
+      <DriverEditDialog
+        motorista={selectedDriver}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSuccess={refreshMotoristas}
+      />
+      <DriverViewDialog
+        motorista={selectedDriver}
+        open={viewOpen}
+        onOpenChange={setViewOpen}
+      />
     </div>
   );
 }
