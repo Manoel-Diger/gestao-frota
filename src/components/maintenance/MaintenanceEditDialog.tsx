@@ -18,6 +18,8 @@ const editSchema = z.object({
   tipo_manutencao: z.string().min(1, "Tipo é obrigatório"),
   data: z.string().min(1, "Data é obrigatória"),
   custo: z.string(),
+  km_atual: z.string().optional(),
+  numero_nf: z.string().optional(),
   descricao: z.string().optional(),
   status: z.string().min(1, "Status é obrigatório"),
   oficina: z.string().optional(),
@@ -44,6 +46,8 @@ export function MaintenanceEditDialog({ manutencao, open, onOpenChange, onSucces
       tipo_manutencao: "Preventiva",
       data: "",
       custo: "0",
+      km_atual: "",
+      numero_nf: "",
       descricao: "",
       status: "Pendente",
       oficina: "",
@@ -64,6 +68,8 @@ export function MaintenanceEditDialog({ manutencao, open, onOpenChange, onSucces
           tipo_manutencao: manutencao.tipo_manutencao || "Preventiva",
           data: manutencao.data || "",
           custo: String(manutencao.custo ?? 0),
+          km_atual: manutencao.km_atual != null ? String(manutencao.km_atual) : "",
+          numero_nf: manutencao.numero_nf || "",
           descricao: manutencao.descricao || "",
           status: manutencao.status || "Pendente",
           oficina: manutencao.oficina || "",
@@ -83,6 +89,8 @@ export function MaintenanceEditDialog({ manutencao, open, onOpenChange, onSucces
           tipo_manutencao: values.tipo_manutencao,
           data: values.data,
           custo: parseFloat(values.custo) || 0,
+          km_atual: values.km_atual ? parseFloat(values.km_atual) : null,
+          numero_nf: values.numero_nf || null,
           descricao: values.descricao || null,
           status: values.status,
           oficina: values.oficina || null,
@@ -153,6 +161,8 @@ export function MaintenanceEditDialog({ manutencao, open, onOpenChange, onSucces
                       <SelectContent>
                         <SelectItem value="Preventiva">Preventiva</SelectItem>
                         <SelectItem value="Corretiva">Corretiva</SelectItem>
+                        <SelectItem value="Lavagem">Lavagem</SelectItem>
+                        <SelectItem value="Pneus">Pneus</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -201,12 +211,40 @@ export function MaintenanceEditDialog({ manutencao, open, onOpenChange, onSucces
 
               <FormField
                 control={form.control}
+                name="km_atual"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Odômetro (KM)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="1" placeholder="Ex: 85000" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="custo"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Custo (R$)</FormLabel>
                     <FormControl>
                       <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="numero_nf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Número da NF</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: 000123456" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -271,6 +271,7 @@ export default function Maintenance() {
                     <TableHead>Motorista</TableHead>
                     <TableHead>Tipo</TableHead>
                     <TableHead>Data</TableHead>
+                    <TableHead>Descrição</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Custo</TableHead>
                     <TableHead className="text-center">Ações</TableHead>
@@ -298,6 +299,9 @@ export default function Maintenance() {
                                 timeZone: "America/Sao_Paulo",
                               })
                             : "N/A"}
+                        </TableCell>
+                        <TableCell className="max-w-[260px] truncate" title={manutencao.descricao || ""}>
+                          {manutencao.descricao || "—"}
                         </TableCell>
                         <TableCell>
                           <Badge variant={getStatusVariant((manutencao as any).status)}>

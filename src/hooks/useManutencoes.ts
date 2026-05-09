@@ -12,6 +12,8 @@ export type Manutencao = {
   descricao: string | null;
   status: string | null;
   oficina: string | null;
+  km_atual: number | null;
+  numero_nf: string | null;
 };
 
 export type ManutencaoInsert = Omit<Manutencao, 'id' | 'created_at'>;

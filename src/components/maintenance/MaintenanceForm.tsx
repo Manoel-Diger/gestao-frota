@@ -34,9 +34,11 @@ import { Plus } from "lucide-react";
 
 const maintenanceSchema = z.object({
   veiculo_placa: z.string().min(1, "Veículo é obrigatório"),
-  tipo_manutencao: z.enum(["Preventiva", "Corretiva"]),
+  tipo_manutencao: z.enum(["Preventiva", "Corretiva", "Lavagem", "Pneus"]),
   data: z.string().min(1, "Data é obrigatória"),
+  km_atual: z.number().min(0, "Odômetro deve ser positivo").optional(),
   custo: z.number().min(0, "Custo deve ser positivo"),
+  numero_nf: z.string().optional(),
   descricao: z.string().min(5, "Descrição deve ter pelo menos 5 caracteres"),
   status: z.enum(["Pendente", "Em Andamento", "Concluída"]),
 });
@@ -59,7 +61,9 @@ export function MaintenanceForm({ onSuccess }: MaintenanceFormProps) {
       veiculo_placa: "",
       tipo_manutencao: "Preventiva",
       data: "",
+      km_atual: 0,
       custo: 0,
+      numero_nf: "",
       descricao: "",
       status: "Pendente",
     },
@@ -89,7 +93,9 @@ export function MaintenanceForm({ onSuccess }: MaintenanceFormProps) {
             veiculo_placa: data.veiculo_placa,
             tipo_manutencao: data.tipo_manutencao,
             data: data.data,
+            km_atual: data.km_atual ?? null,
             custo: data.custo,
+            numero_nf: data.numero_nf || null,
             descricao: data.descricao,
             status: data.status,
           }
@@ -175,6 +181,8 @@ export function MaintenanceForm({ onSuccess }: MaintenanceFormProps) {
                       <SelectContent>
                         <SelectItem value="Preventiva">Preventiva</SelectItem>
                         <SelectItem value="Corretiva">Corretiva</SelectItem>
+                        <SelectItem value="Lavagem">Lavagem</SelectItem>
+                        <SelectItem value="Pneus">Pneus</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -198,6 +206,26 @@ export function MaintenanceForm({ onSuccess }: MaintenanceFormProps) {
 
               <FormField
                 control={form.control}
+                name="km_atual"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Odômetro (KM)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="1"
+                        placeholder="Ex: 85000"
+                        {...field}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="custo"
                 render={({ field }) => (
                   <FormItem>
@@ -210,6 +238,20 @@ export function MaintenanceForm({ onSuccess }: MaintenanceFormProps) {
                         {...field}
                         onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                       />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="numero_nf"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Número da NF</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Ex: 000123456" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
