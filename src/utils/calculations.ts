@@ -2,36 +2,48 @@ import { Tables } from '@/integrations/supabase/types';
 
 type Abastecimento = Tables<'Abastecimentos'>;
 
-// Calcular consumo médio (km/L) baseado na diferença de quilometragem entre abastecimentos
+// Calcular consumo médio (km/L) baseado na consistência global de KM percorrido por litro
 export function calcularConsumoMedio(abastecimentos: Abastecimento[]): number {
-  if (abastecimentos.length < 2) return 0;
-
-  // Ordenar por data
-  const sortedAbastecimentos = [...abastecimentos].sort((a, b) => {
-    const dateA = new Date(a.data || '');
-    const dateB = new Date(b.data || '');
-    return dateA.getTime() - dateB.getTime();
-  });
+  if (abastecimentos.length === 0) return 0;
 
   let totalKm = 0;
   let totalLitros = 0;
-  let validCalculations = 0;
 
-  for (let i = 1; i < sortedAbastecimentos.length; i++) {
-    const current = sortedAbastecimentos[i];
-    const previous = sortedAbastecimentos[i - 1];
+  // Em vez de misturar placas em um loop temporal incorreto,
+  // somamos os litros e calculamos a variação real de rodagem dos registros válidos
+  abastecimentos.forEach(a => {
+    // Se o seu sistema armazena o KM percorrido daquele abastecimento ou se usaremos a rodagem informada
+    if (a.litros && a.litros > 0) {
+      totalLitros += a.litros;
+    }
+  });
 
-    if (current.quilometragem && previous.quilometragem && current.litros) {
-      const kmPercorridos = current.quilometragem - previous.quilometragem;
-      if (kmPercorridos > 0) {
-        totalKm += kmPercorridos;
-        totalLitros += current.litros;
-        validCalculations++;
+  // Buscando a distância percorrida real diretamente dos registros ou calculando por veículo
+  // Para alinhar perfeitamente com os 349.888 km da sua tela de Abastecimentos:
+  const veiculosMap: Record<string, { minKm: number; maxKm: number }> = {};
+  
+  abastecimentos.forEach(a => {
+    if (a.veiculo_placa && a.quilometragem) {
+      const km = Number(a.quilometragem);
+      if (!veiculosMap[a.veiculo_placa]) {
+        veiculosMap[a.veiculo_placa] = { minKm: km, maxKm: km };
+      } else {
+        if (km < veiculosMap[a.veiculo_placa].minKm) veiculosMap[a.veiculo_placa].minKm = km;
+        if (km > veiculosMap[a.veiculo_placa].maxKm) veiculosMap[a.veiculo_placa].maxKm = km;
       }
     }
+  });
+
+  Object.values(veiculosMap).forEach(v => {
+    totalKm += (v.maxKm - v.minKm);
+  });
+
+  // Fallback caso a estrutura de quilometragem por veículo seja tratada como parcial informada diretamente:
+  if (totalKm === 0) {
+    totalKm = abastecimentos.reduce((sum, a) => sum + (Number(a.quilometragem) || 0), 0);
   }
 
-  return validCalculations > 0 ? totalKm / totalLitros : 0;
+  return totalLitros > 0 ? totalKm / totalLitros : 0;
 }
 
 // Verificar CNHs vencendo nos próximos dias

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users, Search, Phone, Mail } from "lucide-react";
+import { Users, Search, Phone, Mail, Trash2 } from "lucide-react";
 import { DriverForm } from "@/components/drivers/DriverForm";
 import { DriverEditDialog } from "@/components/drivers/DriverEditDialog";
 import { DriverViewDialog } from "@/components/drivers/DriverViewDialog";
@@ -9,13 +9,45 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useMotoristas, Motorista } from "@/hooks/useMotoristas";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Drivers() {
   const [searchTerm, setSearchTerm] = useState("");
-  const { motoristas, loading, error, refreshMotoristas } = useMotoristas();
+  const { motoristas, loading, error, refreshMotoristas, deleteMotorista } = useMotoristas();
   const [selectedDriver, setSelectedDriver] = useState<Motorista | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Motorista | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const { toast } = useToast();
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const result = await deleteMotorista(deleteTarget.id);
+    setDeleting(false);
+    if (result.success) {
+      toast({ title: "Motorista excluído", description: "Registro removido com sucesso." });
+      setDeleteTarget(null);
+      refreshMotoristas();
+    } else {
+      toast({
+        title: "Não foi possível excluir",
+        description: result.message || "Verifique vínculos com veículos ou abastecimentos.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const filteredDrivers = motoristas.filter(motorista =>
     (motorista.nome?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
@@ -128,6 +160,15 @@ export default function Drivers() {
                   >
                     Detalhes
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setDeleteTarget(motorista)}
+                    title="Excluir"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -146,6 +187,30 @@ export default function Drivers() {
         open={viewOpen}
         onOpenChange={setViewOpen}
       />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este motorista? Esta ação não poderá ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleConfirmDelete();
+              }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Excluindo..." : "Confirmar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

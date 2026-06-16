@@ -25,7 +25,6 @@ export function useMotoristas() {
         .from('Motoristas')
         .select('*')
         .order('created_at', { ascending: false });
-
       if (error) throw error;
       setMotoristas((data as Motorista[]) || []);
     } catch (err) {
@@ -35,13 +34,21 @@ export function useMotoristas() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchMotoristas();
-  }, [fetchMotoristas]);
+  useEffect(() => { fetchMotoristas(); }, [fetchMotoristas]);
 
-  const refreshMotoristas = useCallback(async () => {
-    await fetchMotoristas();
-  }, [fetchMotoristas]);
+  const refreshMotoristas = useCallback(async () => { await fetchMotoristas(); }, [fetchMotoristas]);
 
-  return { motoristas, loading, error, refreshMotoristas, refetch: refreshMotoristas };
+  const deleteMotorista = useCallback(async (id: number) => {
+    try {
+      const { error } = await (supabase as any).from('Motoristas').delete().eq('id', id);
+      if (error) throw error;
+      setMotoristas((prev) => prev.filter((m) => m.id !== id));
+      return { success: true as const };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erro ao excluir motorista.';
+      return { success: false as const, message };
+    }
+  }, []);
+
+  return { motoristas, loading, error, refreshMotoristas, refetch: refreshMotoristas, deleteMotorista };
 }

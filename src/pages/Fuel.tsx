@@ -1,11 +1,11 @@
 import { useState, useMemo } from "react";
 import { Fuel, TrendingDown, TrendingUp, DollarSign, Search, AlertTriangle, Eye, Pencil, Trash2, Gauge, Route } from "lucide-react";
-import { FuelForm } from "@/components/fuel/FuelForm";
-import { FuelViewDialog } from "@/components/fuel/FuelViewDialog";
-import { FuelEditDialog } from "@/components/fuel/FuelEditDialog";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { FuelForm } from "../components/fuel/FuelForm";
+import { FuelViewDialog } from "../components/fuel/FuelViewDialog";
+import { FuelEditDialog } from "../components/fuel/FuelEditDialog";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import {
   Table,
   TableBody,
@@ -13,10 +13,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { useAbastecimentos, Abastecimento } from "@/hooks/useAbastecimentos";
-import { useToast } from "@/hooks/use-toast";
-import { MonthYearFilter, matchesMonthYear } from "@/components/shared/MonthYearFilter";
+} from "../components/ui/table";
+import { useAbastecimentos, Abastecimento } from "../hooks/useAbastecimentos";
+import { useToast } from "../hooks/use-toast";
+import { MonthYearFilter, matchesMonthYear } from "../components/shared/MonthYearFilter";
 
 export default function FuelPage() {
   const { abastecimentos, loading, error, refetch, deleteAbastecimento } = useAbastecimentos();
@@ -43,10 +43,9 @@ export default function FuelPage() {
     });
   }, [abastecimentos, searchTerm, periodFilter]);
 
-  // Cálculos dinâmicos por filtro
+  // Cálculos dinâmicos por filtro (sempre baseados nos registros filtrados)
   const stats = useMemo(() => {
-    const hasFilter = !!searchTerm || periodFilter !== "all";
-    const filtered = hasFilter ? filteredAbastecimentos : abastecimentos;
+    const filtered = filteredAbastecimentos;
     const totalGasto = filtered.reduce((sum, ab) => sum + (Number(ab.custo_total) || 0), 0);
     const totalLitros = filtered.reduce((sum, ab) => sum + (Number(ab.litros) || 0), 0);
     const totalAbastecimentos = filtered.length;
@@ -68,7 +67,17 @@ export default function FuelPage() {
     let totalLitrosConsumo = 0;
     let totalCustoConsumo = 0;
 
+    let kmPercorridoTotal = 0;
+
     Object.values(porPlaca).forEach((grupo) => {
+      // KM Percorrido por veículo: maior KM - menor KM no período filtrado
+      const kms = grupo
+        .map((ab) => Number(ab.quilometragem))
+        .filter((k) => Number.isFinite(k) && k > 0);
+      if (kms.length >= 2) {
+        kmPercorridoTotal += Math.max(...kms) - Math.min(...kms);
+      }
+
       const sorted = [...grupo].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
       for (let i = 1; i < sorted.length; i++) {
         const kmAtual = Number(sorted[i].quilometragem) || 0;
@@ -87,8 +96,8 @@ export default function FuelPage() {
     consumoMedio = totalLitrosConsumo > 0 ? totalKmRodados / totalLitrosConsumo : 0;
     cpk = totalKmRodados > 0 ? totalCustoConsumo / totalKmRodados : 0;
 
-    return { totalGasto, totalLitros, totalAbastecimentos, precoMedioGeral, consumoMedio, cpk };
-  }, [abastecimentos, filteredAbastecimentos, searchTerm, periodFilter]);
+    return { totalGasto, totalLitros, totalAbastecimentos, precoMedioGeral, consumoMedio, cpk, kmPercorridoTotal };
+  }, [filteredAbastecimentos]);
 
   const handleView = (abastecimento: Abastecimento) => {
     setViewAbastecimento(abastecimento);
@@ -131,91 +140,106 @@ export default function FuelPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card className="transition-all duration-300 hover:shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Gasto Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-emerald-500" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+        <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Gasto Total</CardTitle>
+            <DollarSign className="h-4 w-4 text-emerald-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold transition-all duration-500">
-              R$ {stats.totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          <CardContent className="space-y-1">
+            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+              R$ {stats.totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-[11px] font-medium text-slate-500">
               {searchTerm ? '🔍 Filtrado' : 'Gasto acumulado'}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="transition-all duration-300 hover:shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Litros Consumidos</CardTitle>
-            <Fuel className="h-4 w-4 text-blue-500" />
+        <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Litros Consumidos</CardTitle>
+            <Fuel className="h-4 w-4 text-blue-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold transition-all duration-500">
-              {stats.totalLitros.toLocaleString('pt-BR', { minimumFractionDigits: 1 })}L
+          <CardContent className="space-y-1">
+            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+              {stats.totalLitros.toLocaleString('pt-BR', { minimumFractionDigits: 1 })} <span className="text-xs font-normal text-muted-foreground">L</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-[11px] font-medium text-slate-500">
               {searchTerm ? '🔍 Filtrado' : 'Total consumido'}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="transition-all duration-300 hover:shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Abastecimentos</CardTitle>
-            <TrendingUp className="h-4 w-4 text-orange-500" />
+        <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Abastecimentos</CardTitle>
+            <TrendingUp className="h-4 w-4 text-orange-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold transition-all duration-500">{stats.totalAbastecimentos}</div>
-            <p className="text-xs text-muted-foreground mt-1">
+          <CardContent className="space-y-1">
+            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">{stats.totalAbastecimentos}</div>
+            <p className="text-[11px] font-medium text-slate-500">
               {searchTerm ? '🔍 Filtrado' : 'Registros'}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="transition-all duration-300 hover:shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Preço Médio/Litro</CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-500" />
+        <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Preço Médio/Litro</CardTitle>
+            <TrendingDown className="h-4 w-4 text-rose-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold transition-all duration-500">
-              R$ {stats.precoMedioGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          <CardContent className="space-y-1">
+            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+              R$ {stats.precoMedioGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-[11px] font-medium text-slate-500">
               {searchTerm ? '🔍 Filtrado' : 'Média geral'}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="transition-all duration-300 hover:shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Consumo Médio</CardTitle>
-            <Gauge className="h-4 w-4 text-violet-500" />
+        <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Consumo Médio</CardTitle>
+            <Gauge className="h-4 w-4 text-violet-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold transition-all duration-500">
-              {stats.consumoMedio > 0 ? stats.consumoMedio.toFixed(1) : '—'} <span className="text-sm font-normal text-muted-foreground">km/L</span>
+          <CardContent className="space-y-1">
+            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+              {stats.consumoMedio > 0 ? stats.consumoMedio.toFixed(1) : '—'} <span className="text-xs font-normal text-muted-foreground">km/L</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-[11px] font-medium text-slate-500">
               {searchTerm ? '🔍 Filtrado' : 'Média da frota'}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="transition-all duration-300 hover:shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">CPK</CardTitle>
-            <Route className="h-4 w-4 text-amber-500" />
+        <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">CPK</CardTitle>
+            <Route className="h-4 w-4 text-amber-600" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold transition-all duration-500">
-              {stats.cpk > 0 ? `R$ ${stats.cpk.toFixed(2)}` : '—'} <span className="text-sm font-normal text-muted-foreground">/km</span>
+          <CardContent className="space-y-1">
+            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+              {stats.cpk > 0 ? `R$ ${stats.cpk.toFixed(2)}` : '—'} <span className="text-xs font-normal text-muted-foreground">/km</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-[11px] font-medium text-slate-500">
               {searchTerm ? '🔍 Filtrado' : 'Custo por km'}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">KM Percorrido</CardTitle>
+            <Route className="h-4 w-4 text-cyan-600" />
+          </CardHeader>
+          <CardContent className="space-y-1">
+            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+              {stats.kmPercorridoTotal.toLocaleString('pt-BR')} <span className="text-xs font-normal text-muted-foreground">km</span>
+            </div>
+            <p className="text-[11px] font-medium text-slate-500">
+              {searchTerm || periodFilter !== 'all' ? '🔍 Filtrado' : 'Distância total'}
             </p>
           </CardContent>
         </Card>
@@ -268,8 +292,8 @@ export default function FuelPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Placa</TableHead>
-                     <TableHead>Motorista</TableHead>
-                     <TableHead>Data</TableHead>
+                    <TableHead>Motorista</TableHead>
+                    <TableHead>Data</TableHead>
                     <TableHead className="text-right">Litros</TableHead>
                     <TableHead className="text-right">Km</TableHead>
                     <TableHead className="text-right">Valor Total</TableHead>
