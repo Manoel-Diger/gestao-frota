@@ -66,25 +66,20 @@ export default function FuelPage() {
     let totalKmRodados = 0;
     let totalLitrosConsumo = 0;
     let totalCustoConsumo = 0;
-
     let kmPercorridoTotal = 0;
 
     Object.values(porPlaca).forEach((grupo) => {
-      // KM Percorrido por veículo: maior KM - menor KM no período filtrado
-      const kms = grupo
-        .map((ab) => Number(ab.quilometragem))
-        .filter((k) => Number.isFinite(k) && k > 0);
-      if (kms.length >= 2) {
-        kmPercorridoTotal += Math.max(...kms) - Math.min(...kms);
-      }
+      const sorted = [...grupo]
+        .filter((ab) => Number.isFinite(Number(ab.quilometragem)))
+        .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
 
-      const sorted = [...grupo].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
       for (let i = 1; i < sorted.length; i++) {
         const kmAtual = Number(sorted[i].quilometragem) || 0;
         const kmAnterior = Number(sorted[i - 1].quilometragem) || 0;
         const litrosAtual = Number(sorted[i].litros) || 0;
         const custoAtual = Number(sorted[i].custo_total) || 0;
-        if (kmAtual > 0 && kmAnterior > 0 && kmAtual > kmAnterior) {
+
+        if (kmAtual > kmAnterior) {
           const diff = kmAtual - kmAnterior;
           totalKmRodados += diff;
           totalLitrosConsumo += litrosAtual;
@@ -93,8 +88,9 @@ export default function FuelPage() {
       }
     });
 
+    kmPercorridoTotal = totalKmRodados;
     consumoMedio = totalLitrosConsumo > 0 ? totalKmRodados / totalLitrosConsumo : 0;
-    cpk = totalKmRodados > 0 ? totalCustoConsumo / totalKmRodados : 0;
+    cpk = kmPercorridoTotal > 0 ? totalCustoConsumo / kmPercorridoTotal : 0;
 
     return { totalGasto, totalLitros, totalAbastecimentos, precoMedioGeral, consumoMedio, cpk, kmPercorridoTotal };
   }, [filteredAbastecimentos]);
@@ -140,107 +136,130 @@ export default function FuelPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7 gap-3">
         <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Gasto Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-emerald-600" />
+          <CardHeader className="flex items-start justify-between gap-2 pb-2.5">
+            <div className="space-y-0.5">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Gasto Total</CardTitle>
+              <p className="text-xs text-slate-500">Acumulado</p>
+            </div>
+            <div className="rounded-lg bg-emerald-100 p-1.5 text-emerald-700 flex-shrink-0">
+              <DollarSign className="h-4 w-4" />
+            </div>
           </CardHeader>
-          <CardContent className="space-y-1">
-            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+          <CardContent className="space-y-1.5 pt-0">
+            <div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 whitespace-nowrap">
               R$ {stats.totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <p className="text-[11px] font-medium text-slate-500">
-              {searchTerm ? '🔍 Filtrado' : 'Gasto acumulado'}
-            </p>
+            <p className="text-xs text-slate-500">{searchTerm ? '🔍 Filtrado' : 'Período'}</p>
           </CardContent>
         </Card>
 
         <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Litros Consumidos</CardTitle>
-            <Fuel className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent className="space-y-1">
-            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
-              {stats.totalLitros.toLocaleString('pt-BR', { minimumFractionDigits: 1 })} <span className="text-xs font-normal text-muted-foreground">L</span>
+          <CardHeader className="flex items-start justify-between gap-2 pb-2.5">
+            <div className="space-y-0.5">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Litros Consumidos</CardTitle>
+              <p className="text-xs text-slate-500">Combustível</p>
             </div>
-            <p className="text-[11px] font-medium text-slate-500">
-              {searchTerm ? '🔍 Filtrado' : 'Total consumido'}
-            </p>
+            <div className="rounded-lg bg-sky-100 p-1.5 text-sky-700 flex-shrink-0">
+              <Fuel className="h-4 w-4" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-1.5 pt-0">
+            <div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 whitespace-nowrap">
+              {stats.totalLitros.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <span className="text-xs font-medium text-muted-foreground">L</span>
+            </div>
+            <p className="text-xs text-slate-500">{searchTerm ? '🔍 Filtrado' : 'Total'}</p>
           </CardContent>
         </Card>
 
         <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Abastecimentos</CardTitle>
-            <TrendingUp className="h-4 w-4 text-orange-600" />
+          <CardHeader className="flex items-start justify-between gap-2 pb-2.5">
+            <div className="space-y-0.5">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Abastecimentos</CardTitle>
+              <p className="text-xs text-slate-500">Registros</p>
+            </div>
+            <div className="rounded-lg bg-orange-100 p-1.5 text-orange-700 flex-shrink-0">
+              <TrendingUp className="h-4 w-4" />
+            </div>
           </CardHeader>
-          <CardContent className="space-y-1">
-            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">{stats.totalAbastecimentos}</div>
-            <p className="text-[11px] font-medium text-slate-500">
-              {searchTerm ? '🔍 Filtrado' : 'Registros'}
-            </p>
+          <CardContent className="space-y-1.5 pt-0">
+            <div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 whitespace-nowrap">
+              {stats.totalAbastecimentos}
+            </div>
+            <p className="text-xs text-slate-500">{searchTerm ? '🔍 Filtrado' : 'Entradas'}</p>
           </CardContent>
         </Card>
 
         <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Preço Médio/Litro</CardTitle>
-            <TrendingDown className="h-4 w-4 text-rose-600" />
+          <CardHeader className="flex items-start justify-between gap-2 pb-2.5">
+            <div className="space-y-0.5">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Preço Médio</CardTitle>
+              <p className="text-xs text-slate-500">Por litro</p>
+            </div>
+            <div className="rounded-lg bg-rose-100 p-1.5 text-rose-700 flex-shrink-0">
+              <TrendingDown className="h-4 w-4" />
+            </div>
           </CardHeader>
-          <CardContent className="space-y-1">
-            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
+          <CardContent className="space-y-1.5 pt-0">
+            <div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 whitespace-nowrap">
               R$ {stats.precoMedioGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <p className="text-[11px] font-medium text-slate-500">
-              {searchTerm ? '🔍 Filtrado' : 'Média geral'}
-            </p>
+            <p className="text-xs text-slate-500">{searchTerm ? '🔍 Filtrado' : 'Média'}</p>
           </CardContent>
         </Card>
 
         <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Consumo Médio</CardTitle>
-            <Gauge className="h-4 w-4 text-violet-600" />
-          </CardHeader>
-          <CardContent className="space-y-1">
-            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
-              {stats.consumoMedio > 0 ? stats.consumoMedio.toFixed(1) : '—'} <span className="text-xs font-normal text-muted-foreground">km/L</span>
+          <CardHeader className="flex items-start justify-between gap-2 pb-2.5">
+            <div className="space-y-0.5">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Consumo Médio</CardTitle>
+              <p className="text-xs text-slate-500">Eficiência</p>
             </div>
-            <p className="text-[11px] font-medium text-slate-500">
-              {searchTerm ? '🔍 Filtrado' : 'Média da frota'}
-            </p>
+            <div className="rounded-lg bg-violet-100 p-1.5 text-violet-700 flex-shrink-0">
+              <Gauge className="h-4 w-4" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-1.5 pt-0">
+            <div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 whitespace-nowrap">
+              {stats.consumoMedio > 0 ? stats.consumoMedio.toFixed(1) : '—'} <span className="text-xs font-medium text-muted-foreground">km/L</span>
+            </div>
+            <p className="text-xs text-slate-500">{searchTerm ? '🔍 Filtrado' : 'Frota'}</p>
           </CardContent>
         </Card>
 
         <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">CPK</CardTitle>
-            <Route className="h-4 w-4 text-amber-600" />
-          </CardHeader>
-          <CardContent className="space-y-1">
-            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
-              {stats.cpk > 0 ? `R$ ${stats.cpk.toFixed(2)}` : '—'} <span className="text-xs font-normal text-muted-foreground">/km</span>
+          <CardHeader className="flex items-start justify-between gap-2 pb-2.5">
+            <div className="space-y-0.5">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">CPK</CardTitle>
+              <p className="text-xs text-slate-500">Custo/km</p>
             </div>
-            <p className="text-[11px] font-medium text-slate-500">
-              {searchTerm ? '🔍 Filtrado' : 'Custo por km'}
-            </p>
+            <div className="rounded-lg bg-amber-100 p-1.5 text-amber-700 flex-shrink-0">
+              <Route className="h-4 w-4" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-1.5 pt-0">
+            <div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 whitespace-nowrap">
+              {stats.cpk > 0 ? `R$ ${stats.cpk.toFixed(2)}` : '—'} <span className="text-xs font-medium text-muted-foreground">/km</span>
+            </div>
+            <p className="text-xs text-slate-500">{searchTerm ? '🔍 Filtrado' : 'Gestão'}</p>
           </CardContent>
         </Card>
 
         <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">KM Percorrido</CardTitle>
-            <Route className="h-4 w-4 text-cyan-600" />
-          </CardHeader>
-          <CardContent className="space-y-1">
-            <div className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-50">
-              {stats.kmPercorridoTotal.toLocaleString('pt-BR')} <span className="text-xs font-normal text-muted-foreground">km</span>
+          <CardHeader className="flex items-start justify-between gap-2 pb-2.5">
+            <div className="space-y-0.5">
+              <CardTitle className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">KM Rodado</CardTitle>
+              <p className="text-xs text-slate-500">Distância</p>
             </div>
-            <p className="text-[11px] font-medium text-slate-500">
-              {searchTerm || periodFilter !== 'all' ? '🔍 Filtrado' : 'Distância total'}
-            </p>
+            <div className="rounded-lg bg-cyan-100 p-1.5 text-cyan-700 flex-shrink-0">
+              <Route className="h-4 w-4" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-1.5 pt-0">
+            <div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 whitespace-nowrap">
+              {stats.kmPercorridoTotal.toLocaleString('pt-BR')} <span className="text-xs font-medium text-muted-foreground">km</span>
+            </div>
+            <p className="text-xs text-slate-500">{searchTerm || periodFilter !== 'all' ? '🔍 Filtrado' : 'Total'}</p>
           </CardContent>
         </Card>
       </div>
