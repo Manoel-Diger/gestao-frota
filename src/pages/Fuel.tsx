@@ -1,11 +1,11 @@
 import { useState, useMemo } from "react";
 import { Fuel, TrendingDown, TrendingUp, DollarSign, Search, AlertTriangle, Eye, Pencil, Trash2, Gauge, Route } from "lucide-react";
-import { FuelForm } from "../components/fuel/FuelForm";
-import { FuelViewDialog } from "../components/fuel/FuelViewDialog";
-import { FuelEditDialog } from "../components/fuel/FuelEditDialog";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
+import { FuelForm } from "@/components/fuel/FuelForm";
+import { FuelViewDialog } from "@/components/fuel/FuelViewDialog";
+import { FuelEditDialog } from "@/components/fuel/FuelEditDialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -13,10 +13,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "../components/ui/table";
-import { useAbastecimentos, Abastecimento } from "../hooks/useAbastecimentos";
-import { useToast } from "../hooks/use-toast";
-import { MonthYearFilter, matchesMonthYear } from "../components/shared/MonthYearFilter";
+} from "@/components/ui/table";
+import { useAbastecimentos, Abastecimento } from "@/hooks/useAbastecimentos";
+import { useToast } from "@/hooks/use-toast";
+import { MonthYearFilter, matchesMonthYear } from "@/components/shared/MonthYearFilter";
 
 export default function FuelPage() {
   const { abastecimentos, loading, error, refetch, deleteAbastecimento } = useAbastecimentos();
@@ -55,45 +55,46 @@ export default function FuelPage() {
     let consumoMedio = 0;
     let cpk = 0;
 
-    // Agrupar por placa para calcular consumo
-    const porPlaca: Record<string, Abastecimento[]> = {};
-    filtered.forEach((ab) => {
+    // KM Percorrido / Consumo: para cada abastecimento filtrado, o trecho é a
+    // diferença entre o hodômetro atual e o do abastecimento ANTERIOR do mesmo
+    // veículo na base completa (mesmo que o anterior esteja fora do período filtrado)
+    const porPlacaCompleto: Record<string, Abastecimento[]> = {};
+    (abastecimentos || []).forEach((ab) => {
       const placa = ab.veiculo_placa || "sem_placa";
-      if (!porPlaca[placa]) porPlaca[placa] = [];
-      porPlaca[placa].push(ab);
+      if (!porPlacaCompleto[placa]) porPlacaCompleto[placa] = [];
+      porPlacaCompleto[placa].push(ab);
+    });
+    Object.values(porPlacaCompleto).forEach((grupo) => {
+      grupo.sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
     });
 
     let totalKmRodados = 0;
-    let totalLitrosConsumo = 0;
-    let totalCustoConsumo = 0;
+    let totalLitrosDosIntervalos = 0;
+    let totalCustoDosIntervalos = 0;
     let kmPercorridoTotal = 0;
 
-    Object.values(porPlaca).forEach((grupo) => {
-      const sorted = [...grupo]
-        .filter((ab) => Number.isFinite(Number(ab.quilometragem)))
-        .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+    filtered.forEach((ab) => {
+      const placa = ab.veiculo_placa || "sem_placa";
+      const historico = porPlacaCompleto[placa] || [];
+      const idx = historico.findIndex((h) => h.id === ab.id);
+      if (idx <= 0) return; // sem abastecimento anterior conhecido
 
-      for (let i = 1; i < sorted.length; i++) {
-        const kmAtual = Number(sorted[i].quilometragem) || 0;
-        const kmAnterior = Number(sorted[i - 1].quilometragem) || 0;
-        const litrosAtual = Number(sorted[i].litros) || 0;
-        const custoAtual = Number(sorted[i].custo_total) || 0;
-
-        if (kmAtual > kmAnterior) {
-          const diff = kmAtual - kmAnterior;
-          totalKmRodados += diff;
-          totalLitrosConsumo += litrosAtual;
-          totalCustoConsumo += custoAtual;
-        }
+      const kmAtual = Number(ab.quilometragem) || 0;
+      const kmAnterior = Number(historico[idx - 1].quilometragem) || 0;
+      if (kmAtual > 0 && kmAnterior > 0 && kmAtual > kmAnterior) {
+        const diff = kmAtual - kmAnterior;
+        totalKmRodados += diff;
+        kmPercorridoTotal += diff;
+        totalLitrosDosIntervalos += Number(ab.litros) || 0;
+        totalCustoDosIntervalos += Number(ab.custo_total) || 0;
       }
     });
 
-    kmPercorridoTotal = totalKmRodados;
-    consumoMedio = totalLitrosConsumo > 0 ? totalKmRodados / totalLitrosConsumo : 0;
-    cpk = kmPercorridoTotal > 0 ? totalCustoConsumo / kmPercorridoTotal : 0;
+    consumoMedio = totalLitrosDosIntervalos > 0 ? totalKmRodados / totalLitrosDosIntervalos : 0;
+    cpk = totalKmRodados > 0 ? totalGasto / totalKmRodados : 0;
 
     return { totalGasto, totalLitros, totalAbastecimentos, precoMedioGeral, consumoMedio, cpk, kmPercorridoTotal };
-  }, [filteredAbastecimentos]);
+  }, [filteredAbastecimentos, abastecimentos]);
 
   const handleView = (abastecimento: Abastecimento) => {
     setViewAbastecimento(abastecimento);
@@ -136,132 +137,108 @@ export default function FuelPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7 gap-3">
-        <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
-          <CardHeader className="flex items-start justify-between gap-2 pb-2.5">
-            <div className="space-y-0.5">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Gasto Total</CardTitle>
-              <p className="text-xs text-slate-500">Acumulado</p>
-            </div>
-            <div className="rounded-lg bg-emerald-100 p-1.5 text-emerald-700 flex-shrink-0">
-              <DollarSign className="h-4 w-4" />
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-1.5 pt-0">
-            <div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 whitespace-nowrap">
-              R$ {stats.totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <p className="text-xs text-slate-500">{searchTerm ? '🔍 Filtrado' : 'Período'}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
-          <CardHeader className="flex items-start justify-between gap-2 pb-2.5">
-            <div className="space-y-0.5">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Litros Consumidos</CardTitle>
-              <p className="text-xs text-slate-500">Combustível</p>
-            </div>
-            <div className="rounded-lg bg-sky-100 p-1.5 text-sky-700 flex-shrink-0">
-              <Fuel className="h-4 w-4" />
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-1.5 pt-0">
-            <div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 whitespace-nowrap">
-              {stats.totalLitros.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} <span className="text-xs font-medium text-muted-foreground">L</span>
-            </div>
-            <p className="text-xs text-slate-500">{searchTerm ? '🔍 Filtrado' : 'Total'}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
-          <CardHeader className="flex items-start justify-between gap-2 pb-2.5">
-            <div className="space-y-0.5">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Abastecimentos</CardTitle>
-              <p className="text-xs text-slate-500">Registros</p>
-            </div>
-            <div className="rounded-lg bg-orange-100 p-1.5 text-orange-700 flex-shrink-0">
-              <TrendingUp className="h-4 w-4" />
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-1.5 pt-0">
-            <div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 whitespace-nowrap">
-              {stats.totalAbastecimentos}
-            </div>
-            <p className="text-xs text-slate-500">{searchTerm ? '🔍 Filtrado' : 'Entradas'}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
-          <CardHeader className="flex items-start justify-between gap-2 pb-2.5">
-            <div className="space-y-0.5">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Preço Médio</CardTitle>
-              <p className="text-xs text-slate-500">Por litro</p>
-            </div>
-            <div className="rounded-lg bg-rose-100 p-1.5 text-rose-700 flex-shrink-0">
-              <TrendingDown className="h-4 w-4" />
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-1.5 pt-0">
-            <div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 whitespace-nowrap">
-              R$ {stats.precoMedioGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <p className="text-xs text-slate-500">{searchTerm ? '🔍 Filtrado' : 'Média'}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
-          <CardHeader className="flex items-start justify-between gap-2 pb-2.5">
-            <div className="space-y-0.5">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">Consumo Médio</CardTitle>
-              <p className="text-xs text-slate-500">Eficiência</p>
-            </div>
-            <div className="rounded-lg bg-violet-100 p-1.5 text-violet-700 flex-shrink-0">
-              <Gauge className="h-4 w-4" />
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-1.5 pt-0">
-            <div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 whitespace-nowrap">
-              {stats.consumoMedio > 0 ? stats.consumoMedio.toFixed(1) : '—'} <span className="text-xs font-medium text-muted-foreground">km/L</span>
-            </div>
-            <p className="text-xs text-slate-500">{searchTerm ? '🔍 Filtrado' : 'Frota'}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
-          <CardHeader className="flex items-start justify-between gap-2 pb-2.5">
-            <div className="space-y-0.5">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">CPK</CardTitle>
-              <p className="text-xs text-slate-500">Custo/km</p>
-            </div>
-            <div className="rounded-lg bg-amber-100 p-1.5 text-amber-700 flex-shrink-0">
-              <Route className="h-4 w-4" />
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-1.5 pt-0">
-            <div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 whitespace-nowrap">
-              {stats.cpk > 0 ? `R$ ${stats.cpk.toFixed(2)}` : '—'} <span className="text-xs font-medium text-muted-foreground">/km</span>
-            </div>
-            <p className="text-xs text-slate-500">{searchTerm ? '🔍 Filtrado' : 'Gestão'}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="transition-all duration-300 hover:shadow-md border-slate-200/60">
-          <CardHeader className="flex items-start justify-between gap-2 pb-2.5">
-            <div className="space-y-0.5">
-              <CardTitle className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">KM Rodado</CardTitle>
-              <p className="text-xs text-slate-500">Distância</p>
-            </div>
-            <div className="rounded-lg bg-cyan-100 p-1.5 text-cyan-700 flex-shrink-0">
-              <Route className="h-4 w-4" />
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-1.5 pt-0">
-            <div className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50 whitespace-nowrap">
-              {stats.kmPercorridoTotal.toLocaleString('pt-BR')} <span className="text-xs font-medium text-muted-foreground">km</span>
-            </div>
-            <p className="text-xs text-slate-500">{searchTerm || periodFilter !== 'all' ? '🔍 Filtrado' : 'Total'}</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+        {(() => {
+          const isFiltered = !!searchTerm || periodFilter !== 'all';
+          const cards = [
+            {
+              title: 'Gasto Total',
+              icon: DollarSign,
+              iconColor: 'text-emerald-500',
+              iconBg: 'bg-emerald-500/10',
+              value: `R$ ${stats.totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+              subtitle: isFiltered ? 'Filtrado' : 'Gasto acumulado',
+            },
+            {
+              title: 'Litros Consumidos',
+              icon: Fuel,
+              iconColor: 'text-blue-500',
+              iconBg: 'bg-blue-500/10',
+              value: stats.totalLitros.toLocaleString('pt-BR', { minimumFractionDigits: 1 }),
+              unit: 'L',
+              subtitle: isFiltered ? 'Filtrado' : 'Total consumido',
+            },
+            {
+              title: 'Total Abastecimentos',
+              icon: TrendingUp,
+              iconColor: 'text-orange-500',
+              iconBg: 'bg-orange-500/10',
+              value: String(stats.totalAbastecimentos),
+              subtitle: isFiltered ? 'Filtrado' : 'Registros',
+            },
+            {
+              title: 'Preço Médio/Litro',
+              icon: TrendingDown,
+              iconColor: 'text-red-500',
+              iconBg: 'bg-red-500/10',
+              value: `R$ ${stats.precoMedioGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+              subtitle: isFiltered ? 'Filtrado' : 'Média geral',
+            },
+            {
+              title: 'Consumo Médio',
+              icon: Gauge,
+              iconColor: 'text-violet-500',
+              iconBg: 'bg-violet-500/10',
+              value: stats.consumoMedio > 0 ? stats.consumoMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—',
+              unit: 'km/L',
+              subtitle: isFiltered ? 'Filtrado' : 'Média da frota',
+            },
+            {
+              title: 'CPK',
+              icon: Route,
+              iconColor: 'text-amber-500',
+              iconBg: 'bg-amber-500/10',
+              value: stats.cpk > 0 ? `R$ ${stats.cpk.toFixed(2)}` : '—',
+              unit: '/km',
+              subtitle: isFiltered ? 'Filtrado' : 'Custo por km',
+            },
+            {
+              title: 'KM Percorrido',
+              icon: Route,
+              iconColor: 'text-cyan-500',
+              iconBg: 'bg-cyan-500/10',
+              value: stats.kmPercorridoTotal.toLocaleString('pt-BR'),
+              unit: 'km',
+              subtitle: isFiltered ? 'Filtrado' : 'Distância total',
+            },
+          ];
+          return cards.map((c) => {
+            const Icon = c.icon;
+            return (
+              <Card
+                key={c.title}
+                className="group relative overflow-hidden border-border/60 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:border-border"
+              >
+                <CardContent className="p-4 flex flex-col h-full min-h-[124px]">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground leading-tight line-clamp-2 min-h-[28px]">
+                      {c.title}
+                    </h3>
+                    <div className={`shrink-0 rounded-lg p-1.5 ${c.iconBg}`}>
+                      <Icon className={`h-4 w-4 ${c.iconColor}`} />
+                    </div>
+                  </div>
+                  <div className="mt-auto pt-3">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold tracking-tight tabular-nums leading-none">
+                        {c.value}
+                      </span>
+                      {c.unit && (
+                        <span className="text-xs font-medium text-muted-foreground leading-none">
+                          {c.unit}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1">
+                      {isFiltered && <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />}
+                      {c.subtitle}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          });
+        })()}
       </div>
 
       {/* Tabela com Pesquisa */}
@@ -311,8 +288,8 @@ export default function FuelPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Placa</TableHead>
-                    <TableHead>Motorista</TableHead>
-                    <TableHead>Data</TableHead>
+                     <TableHead>Motorista</TableHead>
+                     <TableHead>Data</TableHead>
                     <TableHead className="text-right">Litros</TableHead>
                     <TableHead className="text-right">Km</TableHead>
                     <TableHead className="text-right">Valor Total</TableHead>
