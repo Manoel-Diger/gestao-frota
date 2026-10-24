@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -18,6 +19,24 @@ export type Manutencao = {
 
 export type ManutencaoInsert = Omit<Manutencao, 'id' | 'created_at'>;
 
+// Ordena pela data da nota fiscal, da mais recente para a mais antiga.
+// Em caso de empate, utiliza a data de criação como critério secundário.
+const ordenarManutencoes = (lista: Manutencao[]): Manutencao[] => {
+  return [...lista].sort((a, b) => {
+    const comparacaoData = String(b.data ?? '').localeCompare(
+      String(a.data ?? '')
+    );
+
+    if (comparacaoData !== 0) {
+      return comparacaoData;
+    }
+
+    return String(b.created_at ?? '').localeCompare(
+      String(a.created_at ?? '')
+    );
+  });
+};
+
 export function useManutencoes() {
   const [manutencoes, setManutencoes] = useState<Manutencao[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,15 +45,24 @@ export function useManutencoes() {
   const fetchManutencoes = useCallback(async () => {
     try {
       setLoading(true);
+
       const { data, error } = await (supabase as any)
         .from('Manutencoes')
         .select('*')
+        .order('data', { ascending: false })
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setManutencoes((data as Manutencao[]) || []);
+
+      setManutencoes(
+        ordenarManutencoes((data as Manutencao[]) || [])
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao carregar manutenções');
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Erro ao carregar manutenções'
+      );
     } finally {
       setLoading(false);
     }
@@ -44,66 +72,107 @@ export function useManutencoes() {
     await fetchManutencoes();
   }, [fetchManutencoes]);
 
-  const createManutencao = useCallback(async (manutencaoData: Partial<ManutencaoInsert>) => {
-    setError(null);
-    try {
-      const { data, error } = await (supabase as any)
-        .from('Manutencoes')
-        .insert(manutencaoData)
-        .select()
-        .single();
+  const createManutencao = useCallback(
+    async (manutencaoData: Partial<ManutencaoInsert>) => {
+      setError(null);
 
-      if (error) throw error;
-      if (!data) throw new Error('Falha ao criar a manutenção.');
+      try {
+        const { data, error } = await (supabase as any)
+          .from('Manutencoes')
+          .insert(manutencaoData)
+          .select()
+          .single();
 
-      setManutencoes((prev) => [data as Manutencao, ...prev]);
-      return data;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao criar manutenção.';
-      setError(message);
-      console.error(message, err);
-      return null;
-    }
-  }, []);
+        if (error) throw error;
+        if (!data) throw new Error('Falha ao criar a manutenção.');
 
-  const updateManutencao = useCallback(async (id: number, updateData: Partial<ManutencaoInsert>) => {
-    setError(null);
-    try {
-      const { data, error } = await (supabase as any)
-        .from('Manutencoes')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
+        setManutencoes((prev) =>
+          ordenarManutencoes([...prev, data as Manutencao])
+        );
 
-      if (error) throw error;
-      if (!data) throw new Error('Falha ao atualizar a manutenção.');
+        return data;
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Erro ao criar manutenção.';
 
-      setManutencoes((prev) =>
-        prev.map((man) => (man.id === id ? (data as Manutencao) : man))
-      );
-      return data;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao atualizar manutenção.';
-      setError(message);
-      console.error(message, err);
-      return null;
-    }
-  }, []);
+        setError(message);
+        console.error(message, err);
+
+        return null;
+      }
+    },
+    []
+  );
+
+  const updateManutencao = useCallback(
+    async (
+      id: number,
+      updateData: Partial<ManutencaoInsert>
+    ) => {
+      setError(null);
+
+      try {
+        const { data, error } = await (supabase as any)
+          .from('Manutencoes')
+          .update(updateData)
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        if (!data) throw new Error('Falha ao atualizar a manutenção.');
+
+        setManutencoes((prev) =>
+          ordenarManutencoes(
+            prev.map((man) =>
+              man.id === id ? (data as Manutencao) : man
+            )
+          )
+        );
+
+        return data;
+      } catch (err) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Erro ao atualizar manutenção.';
+
+        setError(message);
+        console.error(message, err);
+
+        return null;
+      }
+    },
+    []
+  );
 
   const deleteManutencao = useCallback(async (id: number) => {
     setError(null);
+
     try {
-      const { error } = await (supabase as any).from('Manutencoes').delete().eq('id', id);
+      const { error } = await (supabase as any)
+        .from('Manutencoes')
+        .delete()
+        .eq('id', id);
 
       if (error) throw error;
 
-      setManutencoes((prev) => prev.filter((man) => man.id !== id));
+      setManutencoes((prev) =>
+        prev.filter((man) => man.id !== id)
+      );
+
       return true;
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erro ao deletar manutenção.';
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Erro ao deletar manutenção.';
+
       setError(message);
       console.error(message, err);
+
       return false;
     }
   }, []);
