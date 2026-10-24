@@ -33,13 +33,20 @@ export default function Maintenance() {
 
   useEffect(() => {
     const fetchVeiculos = async () => {
-      const { data } = await (supabase as any)
+      // O vínculo veículo-motorista é gravado em motorista_id; o nome vem do
+      // relacionamento Motoristas (mesmo critério usado na página de Veículos).
+      const client = supabase as any;
+      const res = await client
         .from('Veiculos')
-        .select('placa, motorista');
+        .select('placa, motorista, Motoristas!Veiculos_motorista_id_fkey ( nome )');
+      // Fallback: mantém o comportamento anterior caso o relacionamento falhe
+      const data = res.error
+        ? (await client.from('Veiculos').select('placa, motorista')).data
+        : res.data;
       if (data) {
         const map: Record<string, string> = {};
         data.forEach((v: any) => {
-          if (v.placa) map[v.placa] = v.motorista || 'Não definido';
+          if (v.placa) map[v.placa] = v.motorista || v.Motoristas?.nome || 'Não definido';
         });
         setMotoristaMap(map);
       }
