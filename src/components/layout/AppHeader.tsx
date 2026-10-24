@@ -68,14 +68,14 @@ export function AppHeader() {
   };
 
   return (
-    <header className="h-16 bg-fleet-header border-b border-border flex items-center justify-between px-6 shadow-sm">
-      <div className="flex items-center gap-4">
+    <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-fleet-header px-4 sm:px-6">
+      <div className="flex min-w-0 items-center gap-3">
         <SidebarTrigger className="lg:hidden" />
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
           <Input
             placeholder="Buscar veículos, motoristas..."
-            className="pl-10 w-full md:w-96"
+            className="h-10 w-full border-transparent bg-muted/70 pl-10 shadow-none placeholder:text-muted-foreground/80 focus-visible:bg-card md:w-96"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => {
@@ -87,7 +87,7 @@ export function AppHeader() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -96,7 +96,7 @@ export function AppHeader() {
               {alerts.length > 0 && (
                 <Badge
                   variant="destructive"
-                  className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                  className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-transparent bg-destructive px-1 text-[11px] text-destructive-foreground ring-2 ring-card"
                 >
                   {alerts.length}
                 </Badge>
@@ -104,7 +104,7 @@ export function AppHeader() {
             </Button>
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent align="end" className="w-80">
+          <DropdownMenuContent align="end" className="max-h-[22rem] w-80 overflow-y-auto">
             <DropdownMenuLabel>Notificações</DropdownMenuLabel>
             <DropdownMenuSeparator />
 
@@ -133,16 +133,16 @@ export function AppHeader() {
         {/* User Menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="flex items-center gap-2 h-auto p-2">
+            <Button variant="ghost" className="flex h-auto items-center gap-2.5 p-1.5 sm:pr-3">
               <Avatar className="h-8 w-8">
                 <AvatarImage src="/placeholder-avatar.jpg" alt="User" />
-                <AvatarFallback className="bg-primary text-primary-foreground">
+                <AvatarFallback className="bg-gradient-primary text-primary-foreground">
                   <User className="h-4 w-4" />
                 </AvatarFallback>
               </Avatar>
               <div className="hidden md:block text-left">
-                <p className="text-sm font-medium">Manoel Armenteiro</p>
-                <p className="text-xs text-muted-foreground">Administrador</p>
+                <p className="text-sm font-semibold leading-tight">Manoel Armenteiro</p>
+                <p className="text-xs leading-tight text-muted-foreground">Administrador</p>
               </div>
             </Button>
           </DropdownMenuTrigger>

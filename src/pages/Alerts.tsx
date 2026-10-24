@@ -1,4 +1,5 @@
-import { AlertTriangle, Bell, Settings, Shield, Filter } from "lucide-react";
+import { AlertTriangle, Bell, Settings, Shield, Filter, ShieldAlert, CheckCircle2, IdCard, Wrench, Fuel, ClipboardList, Route } from "lucide-react";
+import { MetricCard } from "@/components/shared/MetricCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,23 @@ import { useChecklists } from "@/hooks/useChecklists";
 import { useSmartAlerts, SmartAlert } from "@/hooks/useSmartAlerts";
 import { useState, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+// Ícone por categoria de alerta (substitui os emojis por ícones do sistema)
+function CategoriaIcon({ categoria }: { categoria: string }) {
+  const icons: Record<string, typeof Wrench> = {
+    cnh: IdCard,
+    manutencao: Wrench,
+    combustivel: Fuel,
+    checklist: ClipboardList,
+    km: Route,
+  };
+  const Icon = icons[categoria] || AlertTriangle;
+  return (
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+      <Icon className="h-[18px] w-[18px]" />
+    </span>
+  );
+}
 
 export default function Alerts() {
   const { alertas, loading, error, refreshAlertas } = useAlertas();
@@ -52,66 +70,35 @@ export default function Alerts() {
   const getPriorityBadge = (priority: string) => {
     switch (priority) {
       case "Crítica": return <Badge variant="destructive">Crítica</Badge>;
-      case "Alta": return <Badge className="bg-warning/10 text-warning border-warning">Alta</Badge>;
-      case "Média": return <Badge className="bg-primary/10 text-primary border-primary">Média</Badge>;
-      case "Baixa": return <Badge variant="outline">Baixa</Badge>;
+      case "Alta": return <Badge variant="warning">Alta</Badge>;
+      case "Média": return <Badge variant="default">Média</Badge>;
+      case "Baixa": return <Badge variant="muted">Baixa</Badge>;
       default: return <Badge variant="secondary">{priority}</Badge>;
-    }
-  };
-
-  const getCategoriaIcon = (cat: string) => {
-    switch (cat) {
-      case 'cnh': return '🪪';
-      case 'manutencao': return '🔧';
-      case 'combustivel': return '⛽';
-      case 'checklist': return '📋';
-      case 'km': return '🛣️';
-      default: return '⚠️';
     }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Alertas</h1>
-          <p className="text-muted-foreground">Monitore alertas inteligentes e notificações</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[1.75rem]">Alertas</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Monitore alertas inteligentes e notificações</p>
         </div>
         <AlertForm onSuccess={refreshAlertas} />
       </div>
 
       {/* Summary Banner */}
       {contagem.total > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Card className="border-destructive/20 bg-destructive/5">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-destructive">{contagem.critica}</p>
-              <p className="text-xs text-muted-foreground">Críticos</p>
-            </CardContent>
-          </Card>
-          <Card className="border-warning/20 bg-warning/5">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-warning">{contagem.alta}</p>
-              <p className="text-xs text-muted-foreground">Altos</p>
-            </CardContent>
-          </Card>
-          <Card className="border-primary/20 bg-primary/5">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-primary">{contagem.media}</p>
-              <p className="text-xs text-muted-foreground">Médios</p>
-            </CardContent>
-          </Card>
-          <Card className="border-success/20 bg-success/5">
-            <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-success">{contagem.baixa}</p>
-              <p className="text-xs text-muted-foreground">Baixos</p>
-            </CardContent>
-          </Card>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricCard title="Críticos" value={contagem.critica} icon={<ShieldAlert />} tone="danger" />
+          <MetricCard title="Altos" value={contagem.alta} icon={<AlertTriangle />} tone="warning" />
+          <MetricCard title="Médios" value={contagem.media} icon={<Bell />} tone="primary" />
+          <MetricCard title="Baixos" value={contagem.baixa} icon={<CheckCircle2 />} tone="success" />
         </div>
       )}
 
       <Tabs defaultValue="smart" className="space-y-4">
-        <TabsList>
+        <TabsList className="h-auto flex-wrap justify-start">
           <TabsTrigger value="smart" className="gap-2">
             <Shield className="h-4 w-4" />
             Inteligentes ({contagem.total})
@@ -153,10 +140,10 @@ export default function Alerts() {
           ) : (
             <div className="space-y-3">
               {filteredSmartAlerts.map((alerta) => (
-                <Card key={alerta.id} className="border-border/50 hover:shadow-md transition-shadow">
+                <Card key={alerta.id}>
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
-                      <span className="text-xl mt-0.5">{getCategoriaIcon(alerta.categoria)}</span>
+                      <CategoriaIcon categoria={alerta.categoria} />
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
                           <h3 className="font-semibold text-sm">{alerta.tipo}</h3>
@@ -177,8 +164,8 @@ export default function Alerts() {
         <TabsContent value="manual">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2.5">
+                <Bell className="h-4 w-4 text-primary" />
                 Alertas Manuais
               </CardTitle>
             </CardHeader>
@@ -211,7 +198,7 @@ export default function Alerts() {
                             </div>
                           </div>
                         </div>
-                        <Badge className={alerta.ativo ? "bg-success/10 text-success border-success" : "bg-muted text-muted-foreground"}>
+                        <Badge variant={alerta.ativo ? "success" : "muted"}>
                           {alerta.ativo ? "Ativo" : "Inativo"}
                         </Badge>
                       </div>
@@ -227,8 +214,8 @@ export default function Alerts() {
         <TabsContent value="config">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2.5">
+                <Settings className="h-4 w-4 text-primary" />
                 Configurações de Alertas
               </CardTitle>
             </CardHeader>

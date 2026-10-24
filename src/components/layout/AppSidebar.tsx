@@ -40,6 +40,15 @@ const settingsItems = [
   { title: "Documentação", url: "/docs", icon: FileText },
 ];
 
+// Estilo do item de menu: o estado ativo usa o atributo data-active do componente
+const menuItemClassName =
+  "relative h-10 gap-3 rounded-lg px-3 font-medium text-sidebar-foreground/80 " +
+  "hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground " +
+  "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground " +
+  "data-[active=true]:before:absolute data-[active=true]:before:inset-y-2 data-[active=true]:before:left-0 " +
+  "data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-full data-[active=true]:before:bg-sidebar-primary " +
+  "data-[active=true]:[&>svg]:text-sidebar-primary";
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
@@ -51,46 +60,36 @@ export function AppSidebar() {
     return false;
   };
 
-  const getNavClassName = (path: string) => {
-    const active = isActive(path);
-    return active 
-      ? "bg-primary text-primary-foreground hover:bg-primary/90 font-medium" 
-      : "hover:bg-muted/80 text-muted-foreground hover:text-foreground";
-  };
-
   return (
-    <Sidebar className="border-r bg-fleet-sidebar">
-      <SidebarContent className="bg-fleet-sidebar">
+    <Sidebar className="border-r border-sidebar-border">
+      <SidebarContent>
         {/* Logo */}
-        <div className="p-6 border-b border-border/20">
+        <div className="flex h-16 shrink-0 items-center border-b border-sidebar-border px-5">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-              <Car className="w-5 h-5 text-white" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-primary shadow-[0_6px_16px_-4px_hsl(var(--primary)/0.7)] ring-1 ring-white/15">
+              <Car className="h-5 w-5 text-white" />
             </div>
             {!collapsed && (
-              <div>
-                <h1 className="text-lg font-bold text-fleet-sidebar-foreground">Diger Frota</h1>
-                <p className="text-xs text-fleet-sidebar-foreground/60">Gestão de Frotas</p>
+              <div className="leading-tight">
+                <h1 className="text-[17px] font-bold tracking-tight text-white">Diger Frota</h1>
+                <p className="text-xs text-sidebar-foreground/60">Gestão de Frotas</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Main Navigation */}
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-fleet-sidebar-foreground/80">
+        <SidebarGroup className="px-3 pt-4">
+          <SidebarGroupLabel className="mb-1 px-3 text-sidebar-foreground/50">
             Principal
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navigationItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink 
-                      to={item.url} 
-                      className={getNavClassName(item.url)}
-                    >
-                      <item.icon className="mr-3 h-4 w-4" />
+                  <SidebarMenuButton asChild isActive={isActive(item.url)} className={menuItemClassName}>
+                    <NavLink to={item.url}>
+                      <item.icon className="h-[18px] w-[18px]" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
@@ -101,20 +100,17 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {/* Settings */}
-        <SidebarGroup className="mt-auto">
-          <SidebarGroupLabel className="text-fleet-sidebar-foreground/80">
+        <SidebarGroup className="mt-auto border-t border-sidebar-border px-3 py-4">
+          <SidebarGroupLabel className="mb-1 px-3 text-sidebar-foreground/50">
             Sistema
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {settingsItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink 
-                      to={item.url} 
-                      className={getNavClassName(item.url)}
-                    >
-                      <item.icon className="mr-3 h-4 w-4" />
+                  <SidebarMenuButton asChild isActive={isActive(item.url)} className={menuItemClassName}>
+                    <NavLink to={item.url}>
+                      <item.icon className="h-[18px] w-[18px]" />
                       {!collapsed && <span>{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>

@@ -1,4 +1,4 @@
-import { BarChart3, Download, Calendar, Filter, TrendingUp, FileText, FileSpreadsheet } from "lucide-react";
+import { BarChart3, Download, Calendar, Filter, TrendingUp, FileText, FileSpreadsheet, Fuel, Wrench, Wallet, Users } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -189,17 +189,17 @@ export default function Reports() {
       'Combustível': 'bg-primary/10 text-primary border-primary/30',
       'Manutenção': 'bg-warning/10 text-warning border-warning/30',
       'Financeiro': 'bg-success/10 text-success border-success/30',
-      'Motoristas': 'bg-accent text-accent-foreground border-border',
+      'Motoristas': 'bg-info/10 text-info border-info/30',
     };
     return map[cat] || 'bg-muted text-muted-foreground';
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground tracking-tight">Relatórios</h1>
-          <p className="text-muted-foreground">Gere e exporte relatórios profissionais da sua frota</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[1.75rem]">Relatórios</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Gere e exporte relatórios profissionais da sua frota</p>
         </div>
         <div className="flex gap-2">
           <ReportForm onSuccess={refreshRelatorios} />
@@ -211,14 +211,18 @@ export default function Reports() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {reportTemplates.map((t) => (
             <StaggerItem key={t.id}>
-              <Card className="group hover:shadow-elevated transition-all duration-300 border-border/50 relative overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-                <CardContent className="p-5">
-                  <div className="text-2xl mb-3">{t.icon}</div>
-                  <h3 className="font-semibold text-sm mb-1">{t.name}</h3>
-                  <p className="text-xs text-muted-foreground mb-3">{t.description}</p>
-                  <Badge className={getCategoryColor(t.category)} variant="outline">{t.category}</Badge>
-                  <div className="flex gap-2 mt-4">
+              <Card className="h-full transition-shadow hover:shadow-elegant">
+                <CardContent className="flex h-full flex-col p-5">
+                  <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    {(() => {
+                      const TemplateIcon = ({ combustivel: Fuel, manutencao: Wrench, custos: Wallet, motoristas: Users } as Record<string, typeof Fuel>)[t.id] || FileText;
+                      return <TemplateIcon className="h-5 w-5" />;
+                    })()}
+                  </div>
+                  <h3 className="mb-1 text-sm font-semibold">{t.name}</h3>
+                  <p className="mb-3 text-xs leading-relaxed text-muted-foreground">{t.description}</p>
+                  <Badge className={`w-fit ${getCategoryColor(t.category)}`} variant="outline">{t.category}</Badge>
+                  <div className="mt-auto flex gap-2 pt-4">
                     <Button size="sm" variant="default" className="flex-1 h-8 text-xs" onClick={() => handleExportPDF(t.id)}>
                       <FileText className="mr-1 h-3 w-3" />
                       PDF
@@ -237,9 +241,9 @@ export default function Reports() {
 
       {/* Checklist Export */}
       <FadeIn delay={0.3}>
-        <Card className="border-border/50">
+        <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2.5">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-success/10">
                 <BarChart3 className="h-4 w-4 text-success" />
               </div>
@@ -266,9 +270,9 @@ export default function Reports() {
 
       {/* Saved Reports */}
       <FadeIn delay={0.4}>
-        <Card className="border-border/50">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-base">Relatórios Salvos</CardTitle>
+            <CardTitle>Relatórios Salvos</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -298,7 +302,7 @@ export default function Reports() {
                         </p>
                       </div>
                     </div>
-                    <Badge className="bg-success/10 text-success border-success/30 w-fit" variant="outline">Salvo</Badge>
+                    <Badge variant="success" className="w-fit">Salvo</Badge>
                   </div>
                 ))}
               </div>

@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Plus, Search, Filter, Car, Fuel, Calendar, MapPin, Eye, Pencil, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, Car, Fuel, Calendar, MapPin, Eye, Pencil, Trash2, Wrench, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { MetricCard } from "@/components/shared/MetricCard";
 import {
   Table,
   TableBody,
@@ -30,11 +31,11 @@ import { VehicleEditDialog } from "@/components/vehicles/VehicleEditDialog";
 import { useToast } from "@/hooks/use-toast";
 
 const statusColors = {
-  "Ativo": "bg-success text-success-foreground",
-  "Manutenção": "bg-warning text-warning-foreground", 
-  "Inativo": "bg-muted text-muted-foreground",
-  "Em uso": "bg-primary text-primary-foreground",
-  "Disponível": "bg-success text-success-foreground",
+  "Ativo": "border-success/25 bg-success/10 text-success",
+  "Manutenção": "border-warning/25 bg-warning/10 text-warning",
+  "Inativo": "border-transparent bg-muted text-muted-foreground",
+  "Em uso": "border-primary/25 bg-primary/10 text-primary",
+  "Disponível": "border-info/25 bg-info/10 text-info",
 };
 
 export default function Vehicles() {
@@ -139,64 +140,20 @@ export default function Vehicles() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Veículos</h1>
-          <p className="text-muted-foreground">Gerencie todos os veículos da frota</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[1.75rem]">Veículos</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Gerencie todos os veículos da frota</p>
         </div>
         <VehicleForm onSuccess={refreshVeiculos} />
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total</p>
-                <p className="text-2xl font-bold">{totalVeiculos}</p>
-              </div>
-              <Car className="h-8 w-8 text-primary" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Ativos</p>
-                <p className="text-2xl font-bold text-success">{veiculosAtivos}</p>
-              </div>
-              <div className="h-8 w-8 rounded-full bg-success/20 flex items-center justify-center">
-                <Car className="h-4 w-4 text-success" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Em Manutenção</p>
-                <p className="text-2xl font-bold text-warning">{veiculosManutencao}</p>
-              </div>
-              <div className="h-8 w-8 rounded-full bg-warning/20 flex items-center justify-center">
-                <Car className="h-4 w-4 text-warning" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Consumo Médio</p>
-                <p className="text-2xl font-bold">12.5L/100km</p>
-              </div>
-              <Fuel className="h-8 w-8 text-primary" />
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard title="Total" value={totalVeiculos} icon={<Car />} tone="primary" />
+        <MetricCard title="Ativos" value={veiculosAtivos} icon={<CheckCircle2 />} tone="success" />
+        <MetricCard title="Em Manutenção" value={veiculosManutencao} icon={<Wrench />} tone="warning" />
+        <MetricCard title="Consumo Médio" value="12.5" unit="L/100km" icon={<Fuel />} tone="info" />
       </div>
 
       {/* Filters */}
@@ -219,7 +176,7 @@ export default function Vehicles() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          <div>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -235,7 +192,7 @@ export default function Vehicles() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                       Carregando veículos...
                     </TableCell>
                   </TableRow>
@@ -247,7 +204,7 @@ export default function Vehicles() {
                   </TableRow>
                 ) : filteredVehicles.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                       Nenhum veículo encontrado
                     </TableCell>
                   </TableRow>
@@ -256,14 +213,15 @@ export default function Vehicles() {
                     <TableRow key={veiculo.id}>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{veiculo.placa || 'N/A'}</p>
+                          <p className="font-semibold tracking-wide">{veiculo.placa || 'N/A'}</p>
                           <p className="text-sm text-muted-foreground">
                             {veiculo.marca} {veiculo.modelo} - {veiculo.ano}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={statusColors[veiculo.status as keyof typeof statusColors] || "bg-muted text-muted-foreground"}>
+                        <Badge className={statusColors[veiculo.status as keyof typeof statusColors] || "border-transparent bg-muted text-muted-foreground"}>
+                          <span className="h-1.5 w-1.5 rounded-full bg-current" />
                           {veiculo.status || 'N/A'}
                         </Badge>
                       </TableCell>
@@ -272,24 +230,24 @@ export default function Vehicles() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                          <div className="h-2 w-20 overflow-hidden rounded-full bg-muted">
                             <div 
                               className={`h-full ${(veiculo.combustivel_atual || 0) > 50 ? 'bg-success' : (veiculo.combustivel_atual || 0) > 25 ? 'bg-warning' : 'bg-destructive'}`}
                               style={{ width: `${veiculo.combustivel_atual || 0}%` }}
                             />
                           </div>
-                          <span className="text-sm">{veiculo.combustivel_atual || 0}%</span>
+                          <span className="text-sm tabular-nums text-muted-foreground">{veiculo.combustivel_atual || 0}%</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1 text-sm">
-                          <Calendar className="h-3 w-3" />
+                        <div className="flex items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground">
+                          <Calendar className="h-3.5 w-3.5" />
                           {veiculo.proxima_manutencao ? new Date(veiculo.proxima_manutencao).toLocaleDateString('pt-BR') : 'N/A'}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1 text-sm">
-                          <MapPin className="h-3 w-3" />
+                        <div className="flex items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground">
+                          <MapPin className="h-3.5 w-3.5" />
                           {veiculo.localizacao || 'N/A'}
                         </div>
                       </TableCell>

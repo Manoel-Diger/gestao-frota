@@ -13,7 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { useChecklists } from '@/hooks/useChecklists';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { ClipboardCheck, Plus, Eye, Edit, Trash2, FileDown } from 'lucide-react';
+import { ClipboardCheck, Plus, Eye, Edit, Trash2, FileDown, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { MetricCard } from '@/components/shared/MetricCard';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -44,9 +45,9 @@ export default function Checklist() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const statusColors: Record<string, string> = {
-    Aprovado: 'bg-success text-success-foreground',
-    Reprovado: 'bg-destructive text-destructive-foreground',
-    Pendente: 'bg-warning text-warning-foreground',
+    Aprovado: 'border-success/25 bg-success/10 text-success',
+    Reprovado: 'border-destructive/25 bg-destructive/10 text-destructive',
+    Pendente: 'border-warning/25 bg-warning/10 text-warning',
   };
 
   const handleCreate = async (values: any) => {
@@ -152,13 +153,10 @@ export default function Checklist() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-3">
-          <ClipboardCheck className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">Checklists</h1>
-            <p className="text-muted-foreground">Inspeções veiculares com inteligência integrada</p>
-          </div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[1.75rem]">Checklists</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Inspeções veiculares com inteligência integrada</p>
         </div>
         <Button onClick={() => setIsCreateOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
@@ -167,31 +165,11 @@ export default function Checklist() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="transition-all duration-500">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-primary transition-all duration-500">{totalChecklists}</p>
-            <p className="text-xs text-muted-foreground">Total Inspeções</p>
-          </CardContent>
-        </Card>
-        <Card className="border-success/20 transition-all duration-500">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-success transition-all duration-500">{aprovados}</p>
-            <p className="text-xs text-muted-foreground">Aprovados</p>
-          </CardContent>
-        </Card>
-        <Card className="border-destructive/20 transition-all duration-500">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-destructive transition-all duration-500">{reprovados}</p>
-            <p className="text-xs text-muted-foreground">Reprovados</p>
-          </CardContent>
-        </Card>
-        <Card className="transition-all duration-500">
-          <CardContent className="p-4 text-center">
-            <p className="text-2xl font-bold text-warning transition-all duration-500">{totalNaoConf}</p>
-            <p className="text-xs text-muted-foreground">Não Conformidades</p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard title="Total Inspeções" value={totalChecklists} icon={<ClipboardCheck />} tone="primary" />
+        <MetricCard title="Aprovados" value={aprovados} icon={<CheckCircle2 />} tone="success" />
+        <MetricCard title="Reprovados" value={reprovados} icon={<XCircle />} tone="danger" />
+        <MetricCard title="Não Conformidades" value={totalNaoConf} icon={<AlertTriangle />} tone="warning" />
       </div>
 
       <Card>
@@ -225,10 +203,11 @@ export default function Checklist() {
                       {format(new Date(checklist.data_inspecao), 'dd/MM/yyyy', { locale: ptBR })}
                     </TableCell>
                     <TableCell>{checklist.tipo_checklist}</TableCell>
-                    <TableCell className="font-mono">{checklist.placa_veiculo}</TableCell>
+                    <TableCell className="font-semibold tracking-wide">{checklist.placa_veiculo}</TableCell>
                     <TableCell>{checklist.motorista_nome || `ID: ${checklist.motorista}`}</TableCell>
                     <TableCell>
                       <Badge className={statusColors[checklist.status_final] || ''}>
+                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
                         {checklist.status_final}
                       </Badge>
                     </TableCell>

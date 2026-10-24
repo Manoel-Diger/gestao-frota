@@ -56,17 +56,17 @@ export default function Drivers() {
 
   const getStatusBadge = (status: string | null) => {
     return status === "Ativo" 
-      ? <Badge className="bg-success/10 text-success border-success">Ativo</Badge>
+      ? <Badge variant="success">Ativo</Badge>
       : <Badge variant="secondary">{status || "Inativo"}</Badge>;
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Motoristas</h1>
-          <p className="text-muted-foreground">Gerencie os motoristas da sua frota</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[1.75rem]">Motoristas</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Gerencie os motoristas da sua frota</p>
         </div>
         <DriverForm onSuccess={refreshMotoristas} />
       </div>
@@ -96,7 +96,7 @@ export default function Drivers() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {loading ? (
           <div className="col-span-full text-center py-8">
-            Carregando motoristas...
+            <span className="text-muted-foreground">Carregando motoristas...</span>
           </div>
         ) : error ? (
           <div className="col-span-full text-center py-8 text-destructive">
@@ -104,16 +104,16 @@ export default function Drivers() {
           </div>
         ) : filteredDrivers.length === 0 ? (
           <div className="col-span-full text-center py-8">
-            Nenhum motorista encontrado
+            <span className="text-muted-foreground">Nenhum motorista encontrado</span>
           </div>
         ) : (
           filteredDrivers.map((motorista) => (
-            <Card key={motorista.id} className="hover:shadow-elegant transition-all duration-300">
+            <Card key={motorista.id} className="transition-shadow hover:shadow-elegant">
               <CardHeader className="pb-4">
                 <div className="flex items-center gap-4">
                   <Avatar className="h-12 w-12">
                     <AvatarImage src="/placeholder.svg" alt={motorista.nome || ''} />
-                    <AvatarFallback className="bg-gradient-primary text-white">
+                    <AvatarFallback className="bg-gradient-primary font-semibold text-white">
                       {motorista.nome?.split(' ').map(n => n[0]).join('') || 'N/A'}
                     </AvatarFallback>
                   </Avatar>
@@ -126,16 +126,16 @@ export default function Drivers() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center gap-2 text-sm">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">{motorista.email || 'Email não informado'}</span>
+                  <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 truncate text-muted-foreground">{motorista.email || 'Email não informado'}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
-                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="text-muted-foreground">{motorista.telefone || 'Telefone não informado'}</span>
                 </div>
-                <div className="pt-2 border-t">
-                  <p className="text-sm font-medium">Veículo Atual:</p>
-                  <p className="text-sm text-muted-foreground">{motorista.placa || 'Não designado'}</p>
+                <div className="border-t pt-3">
+                  <p className="text-xs font-medium text-muted-foreground">Veículo atual</p>
+                  <p className="mt-0.5 text-sm font-semibold tracking-wide">{motorista.placa || 'Não designado'}</p>
                 </div>
                 <div className="flex gap-2 pt-2">
                   <Button

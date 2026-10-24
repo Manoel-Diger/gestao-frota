@@ -2,131 +2,182 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Fleet Management Design System - Professional Transport & Logistics Theme
-All colors MUST be HSL.
-*/
+/* Fleet Management Design System — Transporte & Logística
+   Identidade: azul cobalto (marca) sobre base azul-ardósia fria, barra lateral
+   em azul-noite e verde/âmbar/vermelho com contraste legível (WCAG AA).
+   Todas as cores em HSL. */
 
 @layer base {
   :root {
-    --background: 0 0% 98%;
-    --foreground: 224 71.4% 4.1%;
+    /* Superfícies */
+    --background: 216 33% 97%;
+    --foreground: 222 47% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 224 71.4% 4.1%;
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 224 71.4% 4.1%;
+    --popover-foreground: 222 47% 11%;
 
-    /* Primary: Professional Fleet Blue */
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 98%;
-    --primary-hover: 217 91% 55%;
+    /* Primária: azul cobalto da marca */
+    --primary: 222 80% 46%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 222 80% 40%;
 
-    /* Secondary: Clean Gray */
-    --secondary: 220 14.3% 95.9%;
-    --secondary-foreground: 220.9 39.3% 11%;
+    /* Neutros */
+    --secondary: 215 28% 94%;
+    --secondary-foreground: 222 47% 16%;
 
-    --muted: 220 14.3% 95.9%;
-    --muted-foreground: 220 8.9% 46.1%;
+    --muted: 215 28% 95%;
+    --muted-foreground: 215 16% 38%;
 
-    --accent: 220 14.3% 95.9%;
-    --accent-foreground: 220.9 39.3% 11%;
+    --accent: 215 30% 94%;
+    --accent-foreground: 222 47% 14%;
 
-    /* Status Colors */
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 98%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 98%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 85.7% 97.3%;
+    /* Cores de status (texto e fundo sólido com contraste AA sobre branco) */
+    --success: 161 94% 25%;
+    --success-foreground: 0 0% 100%;
+    --warning: 28 93% 34%;
+    --warning-foreground: 0 0% 100%;
+    --info: 192 88% 29%;
+    --info-foreground: 0 0% 100%;
+    --destructive: 0 72% 47%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 217 91% 60%;
+    --border: 214 22% 89%;
+    --input: 214 22% 85%;
+    --ring: 222 80% 52%;
 
-    --radius: 0.75rem;
+    --radius: 0.625rem;
 
-    /* Fleet-specific tokens */
-    --fleet-sidebar: 224 71.4% 4.1%;
-    --fleet-sidebar-foreground: 210 20% 98%;
+    /* Tokens específicos da frota */
+    --fleet-sidebar: 224 47% 9%;
+    --fleet-sidebar-foreground: 215 22% 78%;
     --fleet-header: 0 0% 100%;
-    --fleet-accent: 217 91% 60%;
-    
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 45%));
-    --gradient-success: linear-gradient(135deg, hsl(142 71% 45%), hsl(142 71% 35%));
-    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(220 14.3% 97%));
-    
-    /* Shadows */
-    --shadow-card: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
-    --shadow-elevated: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -4px hsl(0 0% 0% / 0.1);
-    
-    /* Transitions */
+    --fleet-accent: 217 95% 68%;
+
+    /* Paleta de gráficos (distinguível entre si e para daltônicos) */
+    --chart-1: 222 80% 50%;
+    --chart-2: 174 72% 36%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 262 68% 58%;
+    --chart-5: 346 77% 52%;
+    --chart-6: 215 20% 62%;
+
+    /* Gradientes */
+    --gradient-primary: linear-gradient(135deg, hsl(222 84% 54%), hsl(228 80% 40%));
+    --gradient-success: linear-gradient(135deg, hsl(161 90% 32%), hsl(161 94% 22%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(216 33% 98.5%));
+
+    /* Sombras em tom azul-noite (mais suaves que preto puro) */
+    --shadow-card: 0 1px 2px 0 hsl(222 47% 11% / 0.04), 0 1px 3px 0 hsl(222 47% 11% / 0.05);
+    --shadow-elevated: 0 12px 24px -8px hsl(222 47% 11% / 0.14), 0 4px 8px -4px hsl(222 47% 11% / 0.08);
+    --shadow-elegant: 0 8px 20px -6px hsl(222 47% 11% / 0.12), 0 2px 6px -2px hsl(222 47% 11% / 0.06);
+
+    /* Transições */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-fast: all 0.15s ease-out;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Barra lateral (escura, coerente com --fleet-sidebar) */
+    --sidebar-background: 224 47% 9%;
+    --sidebar-foreground: 215 22% 78%;
+    --sidebar-primary: 217 95% 68%;
+    --sidebar-primary-foreground: 224 47% 9%;
+    --sidebar-accent: 223 38% 16%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 223 30% 17%;
+    --sidebar-ring: 217 95% 68%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 224 40% 7%;
+    --foreground: 214 32% 93%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 224 38% 10%;
+    --card-foreground: 214 32% 93%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 224 38% 10%;
+    --popover-foreground: 214 32% 93%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 217 91% 62%;
+    --primary-foreground: 224 47% 9%;
+    --primary-hover: 217 91% 68%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 223 28% 16%;
+    --secondary-foreground: 214 32% 93%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 223 28% 16%;
+    --muted-foreground: 215 18% 66%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 223 28% 18%;
+    --accent-foreground: 214 32% 93%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --success: 160 70% 46%;
+    --success-foreground: 224 47% 9%;
+    --warning: 38 92% 56%;
+    --warning-foreground: 224 47% 9%;
+    --info: 190 80% 52%;
+    --info-foreground: 224 47% 9%;
+    --destructive: 0 72% 60%;
+    --destructive-foreground: 224 47% 9%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 223 25% 19%;
+    --input: 223 25% 22%;
+    --ring: 217 91% 62%;
+
+    --fleet-header: 224 38% 10%;
+
+    --chart-1: 217 91% 65%;
+    --chart-2: 174 65% 48%;
+    --chart-3: 38 92% 56%;
+    --chart-4: 262 80% 70%;
+    --chart-5: 346 85% 64%;
+    --chart-6: 215 20% 62%;
+
+    --gradient-card: linear-gradient(180deg, hsl(224 38% 11%), hsl(224 38% 9%));
+
+    --shadow-card: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
+    --shadow-elevated: 0 12px 24px -8px hsl(0 0% 0% / 0.5);
+    --shadow-elegant: 0 8px 20px -6px hsl(0 0% 0% / 0.45);
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
+  }
+}
+
+/* Respeita quem prefere menos movimento (acessibilidade) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

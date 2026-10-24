@@ -4,6 +4,7 @@ import { FuelForm } from "@/components/fuel/FuelForm";
 import { FuelViewDialog } from "@/components/fuel/FuelViewDialog";
 import { FuelEditDialog } from "@/components/fuel/FuelEditDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MetricCard } from "@/components/shared/MetricCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -126,34 +127,32 @@ export default function FuelPage() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6 px-4">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Abastecimentos</h1>
-          <p className="text-muted-foreground">Controle de combustível da sua frota</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[1.75rem]">Abastecimentos</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Controle de combustível da sua frota</p>
         </div>
         <FuelForm onSuccess={refetch} />
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
         {(() => {
           const isFiltered = !!searchTerm || periodFilter !== 'all';
           const cards = [
             {
               title: 'Gasto Total',
               icon: DollarSign,
-              iconColor: 'text-emerald-500',
-              iconBg: 'bg-emerald-500/10',
+              tone: 'success' as const,
               value: `R$ ${stats.totalGasto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
               subtitle: isFiltered ? 'Filtrado' : 'Gasto acumulado',
             },
             {
               title: 'Litros Consumidos',
               icon: Fuel,
-              iconColor: 'text-blue-500',
-              iconBg: 'bg-blue-500/10',
+              tone: 'primary' as const,
               value: stats.totalLitros.toLocaleString('pt-BR', { minimumFractionDigits: 1 }),
               unit: 'L',
               subtitle: isFiltered ? 'Filtrado' : 'Total consumido',
@@ -161,24 +160,21 @@ export default function FuelPage() {
             {
               title: 'Total Abastecimentos',
               icon: TrendingUp,
-              iconColor: 'text-orange-500',
-              iconBg: 'bg-orange-500/10',
+              tone: 'warning' as const,
               value: String(stats.totalAbastecimentos),
               subtitle: isFiltered ? 'Filtrado' : 'Registros',
             },
             {
               title: 'Preço Médio/Litro',
               icon: TrendingDown,
-              iconColor: 'text-red-500',
-              iconBg: 'bg-red-500/10',
+              tone: 'danger' as const,
               value: `R$ ${stats.precoMedioGeral.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
               subtitle: isFiltered ? 'Filtrado' : 'Média geral',
             },
             {
               title: 'Consumo Médio',
               icon: Gauge,
-              iconColor: 'text-violet-500',
-              iconBg: 'bg-violet-500/10',
+              tone: 'info' as const,
               value: stats.consumoMedio > 0 ? stats.consumoMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—',
               unit: 'km/L',
               subtitle: isFiltered ? 'Filtrado' : 'Média da frota',
@@ -186,8 +182,7 @@ export default function FuelPage() {
             {
               title: 'CPK',
               icon: Route,
-              iconColor: 'text-amber-500',
-              iconBg: 'bg-amber-500/10',
+              tone: 'warning' as const,
               value: stats.cpk > 0 ? `R$ ${stats.cpk.toFixed(2)}` : '—',
               unit: '/km',
               subtitle: isFiltered ? 'Filtrado' : 'Custo por km',
@@ -195,47 +190,30 @@ export default function FuelPage() {
             {
               title: 'KM Percorrido',
               icon: Route,
-              iconColor: 'text-cyan-500',
-              iconBg: 'bg-cyan-500/10',
+              tone: 'info' as const,
               value: stats.kmPercorridoTotal.toLocaleString('pt-BR'),
               unit: 'km',
               subtitle: isFiltered ? 'Filtrado' : 'Distância total',
             },
           ];
-          return cards.map((c) => {
+          return cards.map((c, i) => {
             const Icon = c.icon;
             return (
-              <Card
+              <MetricCard
                 key={c.title}
-                className="group relative overflow-hidden border-border/60 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 hover:border-border"
-              >
-                <CardContent className="p-4 flex flex-col h-full min-h-[124px]">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground leading-tight line-clamp-2 min-h-[28px]">
-                      {c.title}
-                    </h3>
-                    <div className={`shrink-0 rounded-lg p-1.5 ${c.iconBg}`}>
-                      <Icon className={`h-4 w-4 ${c.iconColor}`} />
-                    </div>
-                  </div>
-                  <div className="mt-auto pt-3">
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-bold tracking-tight tabular-nums leading-none">
-                        {c.value}
-                      </span>
-                      {c.unit && (
-                        <span className="text-xs font-medium text-muted-foreground leading-none">
-                          {c.unit}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1">
-                      {isFiltered && <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />}
-                      {c.subtitle}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+                className={i < 4 ? "lg:col-span-3" : i < 6 ? "lg:col-span-4" : "sm:col-span-2 lg:col-span-4"}
+                title={c.title}
+                value={c.value}
+                unit={c.unit}
+                tone={c.tone}
+                icon={<Icon />}
+                caption={
+                  <span className="flex items-center gap-1.5">
+                    {isFiltered && <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary" />}
+                    {c.subtitle}
+                  </span>
+                }
+              />
             );
           });
         })()}
@@ -305,7 +283,7 @@ export default function FuelPage() {
                     
                     return (
                       <TableRow key={abastecimento.id.toString()}>
-                        <TableCell className="font-medium">
+                        <TableCell className="font-semibold tracking-wide">
                           {abastecimento.veiculo_placa || "N/A"}
                         </TableCell>
                         <TableCell>
@@ -316,14 +294,14 @@ export default function FuelPage() {
                             ? new Date(abastecimento.data + 'T12:00:00').toLocaleDateString("pt-BR")
                             : "N/A"}
                         </TableCell>
-                        <TableCell className="text-right">{litros.toFixed(1)}L</TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="whitespace-nowrap text-right">{litros.toFixed(1)}L</TableCell>
+                        <TableCell className="whitespace-nowrap text-right">
                           {abastecimento.quilometragem?.toLocaleString('pt-BR') || '-'}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="whitespace-nowrap text-right">
                           R$ {custoTotal.toFixed(2)}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="whitespace-nowrap text-right">
                           R$ {precoLitro.toFixed(2)}
                         </TableCell>
                         <TableCell>

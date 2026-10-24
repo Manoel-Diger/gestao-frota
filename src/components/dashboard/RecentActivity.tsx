@@ -9,10 +9,10 @@ import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 const statusColors = {
-  success: "bg-success text-success-foreground",
-  warning: "bg-warning text-warning-foreground",
-  info: "bg-primary text-primary-foreground",
-  error: "bg-destructive text-destructive-foreground",
+  success: "bg-success/10 text-success",
+  warning: "bg-warning/10 text-warning",
+  info: "bg-primary/10 text-primary",
+  error: "bg-destructive/10 text-destructive",
 };
 
 export function RecentActivity() {
@@ -102,26 +102,30 @@ export function RecentActivity() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Clock className="h-5 w-5 text-primary" />
+        <CardTitle className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+            <Clock className="h-4 w-4 text-primary" />
+          </div>
           Atividade Recente
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="divide-y divide-border/70 pt-0">
         {activities.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">
             Nenhuma atividade registrada
           </p>
         ) : (
           activities.map((activity) => (
-            <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-              <div className={`p-2 rounded-full ${statusColors[activity.status as keyof typeof statusColors]}`}>
+            <div key={activity.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${statusColors[activity.status as keyof typeof statusColors]}`}>
                 <activity.icon className="h-4 w-4" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm text-foreground">{activity.title}</p>
-                <p className="text-sm text-muted-foreground truncate">{activity.description}</p>
-                <p className="text-xs text-muted-foreground mt-1">{activity.time}</p>
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-sm font-semibold text-foreground">{activity.title}</p>
+                  <p className="shrink-0 text-xs text-muted-foreground">{activity.time}</p>
+                </div>
+                <p className="truncate text-sm text-muted-foreground">{activity.description}</p>
               </div>
             </div>
           ))

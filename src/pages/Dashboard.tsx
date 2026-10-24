@@ -19,6 +19,16 @@ import { exportToPDF, buildHTMLTable, buildSummaryCards } from "@/utils/exportUt
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { StaggerContainer, StaggerItem, FadeIn } from "@/components/layout/PageTransition";
 import { SkeletonCard } from "@/components/ui/skeleton-card";
+import {
+  chartBarCursor,
+  chartGridProps,
+  chartLegendProps,
+  chartTooltipLabelStyle,
+  chartTooltipStyle,
+  chartXAxisProps,
+  chartYAxisProps,
+  statusChartColor,
+} from "@/components/dashboard/chartTheme";
 
 export default function Dashboard() {
   const { veiculos, loading: loadingV } = useVeiculos();
@@ -172,7 +182,12 @@ export default function Dashboard() {
     return { manutencaoChart, statusChart, consumoChart, checklistChart };
   }, [filteredManutencoes, veiculos, filteredAbastecimentos, checklistStats]);
 
-  const COLORS = ['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))', 'hsl(var(--destructive))', 'hsl(var(--muted))'];
+  // Rótulo das fatias dos gráficos de pizza (texto neutro, legível)
+  const renderPieLabel = ({ name, percent, x, y, textAnchor }: any) => (
+    <text x={x} y={y} textAnchor={textAnchor} dominantBaseline="central" fill="hsl(var(--foreground))" fontSize={12}>
+      {`${name}: ${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
 
   const handleExportDashboard = () => {
     const summary = buildSummaryCards([
@@ -226,21 +241,21 @@ export default function Dashboard() {
 
   const getPrioridadeStyle = (p: string) => {
     switch (p) {
-      case 'Crítica': return 'bg-destructive/10 text-destructive border-destructive/30';
-      case 'Alta': return 'bg-warning/10 text-warning border-warning/30';
-      case 'Média': return 'bg-primary/10 text-primary border-primary/30';
+      case 'Crítica': return 'bg-destructive/5 text-destructive border-destructive/25';
+      case 'Alta': return 'bg-warning/5 text-warning border-warning/25';
+      case 'Média': return 'bg-primary/5 text-primary border-primary/25';
       default: return 'bg-muted text-muted-foreground border-border';
     }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Visão geral da sua frota</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[1.75rem]">Dashboard</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Visão geral da sua frota</p>
         </div>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
           <PeriodFilter selected={period} onChange={setPeriod} />
           <Button onClick={handleExportDashboard} className="bg-gradient-primary hover:opacity-90 transition-opacity">
             <Download className="mr-2 h-4 w-4" />
@@ -252,44 +267,44 @@ export default function Dashboard() {
       {/* Smart Alerts Banner */}
       {contagem.total > 0 && (
         <FadeIn>
-          <div className="flex items-center gap-3 p-3 rounded-lg border border-warning/30 bg-warning/5">
-            <Shield className="h-5 w-5 text-warning flex-shrink-0" />
-            <span className="text-sm font-medium">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-warning/25 bg-warning/5 px-4 py-3">
+            <Shield className="h-5 w-5 flex-shrink-0 text-warning" />
+            <span className="text-sm font-semibold">
               {contagem.total} alerta(s) detectado(s)
             </span>
-            <div className="flex gap-2 ml-auto">
-              {contagem.critica > 0 && <Badge className="bg-destructive/10 text-destructive border-destructive/30">{contagem.critica} crítico(s)</Badge>}
-              {contagem.alta > 0 && <Badge className="bg-warning/10 text-warning border-warning/30">{contagem.alta} alto(s)</Badge>}
-              {contagem.media > 0 && <Badge className="bg-primary/10 text-primary border-primary/30">{contagem.media} médio(s)</Badge>}
+            <div className="ml-auto flex flex-wrap gap-2">
+              {contagem.critica > 0 && <Badge variant="destructive">{contagem.critica} crítico(s)</Badge>}
+              {contagem.alta > 0 && <Badge variant="warning">{contagem.alta} alto(s)</Badge>}
+              {contagem.media > 0 && <Badge variant="default">{contagem.media} médio(s)</Badge>}
             </div>
           </div>
         </FadeIn>
       )}
 
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
         </div>
       ) : (
         <StaggerContainer>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
             <StaggerItem>
-              <StatsCard title="Veículos" value={totalVeiculos.toString()} icon={<Car className="h-5 w-5" />} trend={{ value: `${veiculos.filter(v => v.status === 'Ativo' || v.status === 'Disponível').length} ativos`, isPositive: true }} />
+              <StatsCard tone="primary" title="Veículos" value={totalVeiculos.toString()} icon={<Car className="h-5 w-5" />} trend={{ value: `${veiculos.filter(v => v.status === 'Ativo' || v.status === 'Disponível').length} ativos`, isPositive: true }} />
             </StaggerItem>
             <StaggerItem>
-              <StatsCard title="Motoristas" value={motoristasAtivos.toString()} icon={<Users className="h-5 w-5" />} trend={{ value: `${motoristas.length} total`, isPositive: true }} />
+              <StatsCard tone="info" title="Motoristas" value={motoristasAtivos.toString()} icon={<Users className="h-5 w-5" />} trend={{ value: `${motoristas.length} total`, isPositive: true }} />
             </StaggerItem>
             <StaggerItem>
-              <StatsCard title="Manutenções" value={manutencoesPendentes.toString()} icon={<Wrench className="h-5 w-5" />} trend={{ value: 'pendentes', isPositive: manutencoesPendentes === 0 }} />
+              <StatsCard tone="warning" title="Manutenções" value={manutencoesPendentes.toString()} icon={<Wrench className="h-5 w-5" />} trend={{ value: 'pendentes', isPositive: manutencoesPendentes === 0 }} />
             </StaggerItem>
             <StaggerItem>
-              <StatsCard title="Consumo Médio" value={`${consumoMedio} km/L`} icon={<Gauge className="h-5 w-5" />} trend={{ value: `${filteredAbastecimentos.length} abast.`, isPositive: true }} />
+              <StatsCard tone="info" title="Consumo Médio" value={`${consumoMedio} km/L`} icon={<Gauge className="h-5 w-5" />} trend={{ value: `${filteredAbastecimentos.length} abast.`, isPositive: true }} />
             </StaggerItem>
             <StaggerItem>
-              <StatsCard title="Custo Total" value={`R$ ${(custoTotal.total / 1000).toFixed(1)}k`} icon={<DollarSign className="h-5 w-5" />} trend={{ value: custoPorKm !== '—' ? `CPK: ${custoPorKm}` : 'Sem dados', isPositive: true }} />
+              <StatsCard tone="primary" title="Custo Total" value={`R$ ${(custoTotal.total / 1000).toFixed(1)}k`} icon={<DollarSign className="h-5 w-5" />} trend={{ value: custoPorKm !== '—' ? `CPK: ${custoPorKm}` : 'Sem dados', isPositive: true }} />
             </StaggerItem>
             <StaggerItem>
-              <StatsCard title="Saúde Frota" value={`${checklistStats.saudePct}%`} icon={<ClipboardCheck className="h-5 w-5" />} trend={{ value: `${checklistStats.total} inspeções`, isPositive: checklistStats.saudePct >= 80 }} />
+              <StatsCard tone="success" title="Saúde Frota" value={`${checklistStats.saudePct}%`} icon={<ClipboardCheck className="h-5 w-5" />} trend={{ value: `${checklistStats.total} inspeções`, isPositive: checklistStats.saudePct >= 80 }} />
             </StaggerItem>
           </div>
         </StaggerContainer>
@@ -303,9 +318,9 @@ export default function Dashboard() {
       <FadeIn delay={0.3}>
         <div className="grid gap-6 lg:grid-cols-2">
           {chartData.manutencaoChart.length > 0 && (
-            <Card className="border-border/50">
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2.5">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
                     <Activity className="h-4 w-4 text-primary" />
                   </div>
@@ -315,15 +330,11 @@ export default function Dashboard() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={chartData.manutencaoChart}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '13px' }} />
-                    <Bar dataKey="total" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]}>
-                      {chartData.manutencaoChart.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Bar>
+                    <CartesianGrid {...chartGridProps} />
+                    <XAxis dataKey="name" {...chartXAxisProps} />
+                    <YAxis {...chartYAxisProps} allowDecimals={false} />
+                    <Tooltip cursor={chartBarCursor} contentStyle={chartTooltipStyle} labelStyle={chartTooltipLabelStyle} />
+                    <Bar dataKey="total" fill="hsl(var(--chart-1))" radius={[6, 6, 0, 0]} maxBarSize={44} />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -331,9 +342,9 @@ export default function Dashboard() {
           )}
 
           {chartData.statusChart.length > 0 && (
-            <Card className="border-border/50">
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2.5">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
                     <Car className="h-4 w-4 text-primary" />
                   </div>
@@ -343,11 +354,11 @@ export default function Dashboard() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
-                    <Pie data={chartData.statusChart} cx="50%" cy="50%" labelLine={false} label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`} outerRadius={90} innerRadius={50} fill="hsl(var(--primary))" dataKey="value">
-                      {chartData.statusChart.map((_, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}
+                    <Pie data={chartData.statusChart} cx="50%" cy="50%" labelLine={false} label={renderPieLabel} outerRadius={88} innerRadius={54} paddingAngle={2} cornerRadius={4} stroke="hsl(var(--card))" strokeWidth={2} dataKey="value">
+                      {chartData.statusChart.map((entry, index) => (<Cell key={`cell-${index}`} fill={statusChartColor(entry.name, index)} />))}
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                    <Legend />
+                    <Tooltip contentStyle={chartTooltipStyle} labelStyle={chartTooltipLabelStyle} />
+                    <Legend {...chartLegendProps} />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -355,9 +366,9 @@ export default function Dashboard() {
           )}
 
           {chartData.checklistChart.length > 0 && (
-            <Card className="border-border/50">
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2.5">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-success/10">
                     <ClipboardCheck className="h-4 w-4 text-success" />
                   </div>
@@ -367,12 +378,12 @@ export default function Dashboard() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
-                    <Pie data={chartData.checklistChart} cx="50%" cy="50%" labelLine={false} label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`} outerRadius={90} innerRadius={50} dataKey="value">
+                    <Pie data={chartData.checklistChart} cx="50%" cy="50%" labelLine={false} label={renderPieLabel} outerRadius={88} innerRadius={54} paddingAngle={2} cornerRadius={4} stroke="hsl(var(--card))" strokeWidth={2} dataKey="value">
                       <Cell fill="hsl(var(--success))" />
                       <Cell fill="hsl(var(--destructive))" />
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                    <Legend />
+                    <Tooltip contentStyle={chartTooltipStyle} labelStyle={chartTooltipLabelStyle} />
+                    <Legend {...chartLegendProps} />
                   </PieChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -380,9 +391,9 @@ export default function Dashboard() {
           )}
 
           {chartData.consumoChart.length > 0 && (
-            <Card className="border-border/50">
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2.5">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-warning/10">
                     <Fuel className="h-4 w-4 text-warning" />
                   </div>
@@ -392,14 +403,14 @@ export default function Dashboard() {
               <CardContent>
                 <ResponsiveContainer width="100%" height={280}>
                   <LineChart data={chartData.consumoChart}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="placa" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis yAxisId="left" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis yAxisId="right" orientation="right" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} />
-                    <Legend />
-                    <Line yAxisId="left" type="monotone" dataKey="litros" stroke="hsl(var(--primary))" strokeWidth={2} name="Litros" dot={{ fill: 'hsl(var(--primary))', r: 4 }} />
-                    <Line yAxisId="right" type="monotone" dataKey="custo" stroke="hsl(var(--warning))" strokeWidth={2} name="Custo (R$)" dot={{ fill: 'hsl(var(--warning))', r: 4 }} />
+                    <CartesianGrid {...chartGridProps} />
+                    <XAxis dataKey="placa" {...chartXAxisProps} />
+                    <YAxis yAxisId="left" {...chartYAxisProps} />
+                    <YAxis yAxisId="right" orientation="right" {...chartYAxisProps} />
+                    <Tooltip contentStyle={chartTooltipStyle} labelStyle={chartTooltipLabelStyle} />
+                    <Legend {...chartLegendProps} />
+                    <Line yAxisId="left" type="monotone" dataKey="litros" stroke="hsl(var(--chart-1))" strokeWidth={2.5} name="Litros" dot={{ fill: 'hsl(var(--card))', stroke: 'hsl(var(--chart-1))', strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
+                    <Line yAxisId="right" type="monotone" dataKey="custo" stroke="hsl(var(--chart-3))" strokeWidth={2.5} name="Custo (R$)" dot={{ fill: 'hsl(var(--card))', stroke: 'hsl(var(--chart-3))', strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
                   </LineChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -416,9 +427,9 @@ export default function Dashboard() {
 
           {/* Smart Alerts Panel */}
           <div className="space-y-4">
-            <Card className="border-border/50">
+            <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
+                <CardTitle className="flex items-center gap-2.5">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-warning/10">
                     <AlertTriangle className="h-4 w-4 text-warning" />
                   </div>
@@ -430,9 +441,9 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {smartAlerts.slice(0, 6).map((alerta) => (
-                  <div key={alerta.id} className={`p-3 border rounded-lg ${getPrioridadeStyle(alerta.prioridade)}`}>
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium text-sm">{alerta.tipo}</p>
+                  <div key={alerta.id} className={`rounded-lg border p-3 ${getPrioridadeStyle(alerta.prioridade)}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold">{alerta.tipo}</p>
                       <Badge variant="outline" className={getPrioridadeStyle(alerta.prioridade)}>
                         {alerta.prioridade}
                       </Badge>
@@ -441,10 +452,10 @@ export default function Dashboard() {
                   </div>
                 ))}
                 {smartAlerts.length === 0 && (
-                  <div className="p-3 border border-success/20 bg-success/5 rounded-lg">
+                  <div className="rounded-lg border border-success/20 bg-success/5 p-3">
                     <div className="flex items-center justify-between">
-                      <p className="font-medium text-sm text-success">Tudo em ordem!</p>
-                      <Badge className="bg-success/10 text-success border-success">OK</Badge>
+                      <p className="text-sm font-semibold text-success">Tudo em ordem!</p>
+                      <Badge variant="success">OK</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">Nenhum alerta detectado no momento</p>
                   </div>

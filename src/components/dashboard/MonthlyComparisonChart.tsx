@@ -1,6 +1,15 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import {
+  chartBarCursor,
+  chartGridProps,
+  chartLegendProps,
+  chartTooltipLabelStyle,
+  chartTooltipStyle,
+  chartXAxisProps,
+  chartYAxisProps,
+} from "./chartTheme";
 import { TrendingUp } from "lucide-react";
 import { Abastecimento } from "@/hooks/useAbastecimentos";
 import { Manutencao } from "@/hooks/useManutencoes";
@@ -53,9 +62,9 @@ export function MonthlyComparisonChart({ abastecimentos, manutencoes }: Props) {
   if (data.every(d => d.Total === 0)) return null;
 
   return (
-    <Card className="border-border/50">
+    <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
+        <CardTitle className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
             <TrendingUp className="h-4 w-4 text-primary" />
           </div>
@@ -64,17 +73,19 @@ export function MonthlyComparisonChart({ abastecimentos, manutencoes }: Props) {
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-            <XAxis dataKey="mes" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
+          <BarChart data={data} barGap={4}>
+            <CartesianGrid {...chartGridProps} />
+            <XAxis dataKey="mes" {...chartXAxisProps} />
+            <YAxis {...chartYAxisProps} tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
             <Tooltip
-              contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', fontSize: '13px' }}
+              cursor={chartBarCursor}
+              contentStyle={chartTooltipStyle}
+              labelStyle={chartTooltipLabelStyle}
               formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, undefined]}
             />
-            <Legend />
-            <Bar dataKey="Combustível" fill="hsl(var(--warning))" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Manutenção" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            <Legend {...chartLegendProps} />
+            <Bar dataKey="Combustível" fill="hsl(var(--chart-3))" radius={[6, 6, 0, 0]} maxBarSize={36} />
+            <Bar dataKey="Manutenção" fill="hsl(var(--chart-1))" radius={[6, 6, 0, 0]} maxBarSize={36} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { MetricCard } from "@/components/shared/MetricCard";
 import {
   Table,
   TableBody,
@@ -105,13 +106,13 @@ export default function Maintenance() {
   const getStatusVariant = (status: string | null) => {
     switch (statusKey(status)) {
       case "concluida":
-        return "default";
+        return "success";
       case "cancelada":
         return "destructive";
       case "agendada":
-        return "secondary";
+        return "info";
       default:
-        return "outline";
+        return "warning";
     }
   };
 
@@ -139,86 +140,58 @@ export default function Maintenance() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6 px-4">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Manutenções</h1>
-          <p className="text-muted-foreground">Controle de manutenção da sua frota</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[1.75rem]">Manutenções</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Controle de manutenção da sua frota</p>
         </div>
         <MaintenanceForm onSuccess={refetch} />
       </div>
 
       {/* Stats Cards - 5 cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Custo Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              R$ {stats.totalCusto.toFixed(2)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {searchTerm ? 'Filtrado' : 'Custo acumulado'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Custo Médio</CardTitle>
-            <TrendingUp className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              R$ {stats.custoMedio.toFixed(2)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {searchTerm ? 'Filtrado' : 'Por manutenção'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Manutenções</CardTitle>
-            <Wrench className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.totalManutencoes}</div>
-            <p className="text-xs text-muted-foreground">
-              {searchTerm ? 'Filtrado' : 'Total registrado'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Agendadas</CardTitle>
-            <Calendar className="h-4 w-4 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.agendadas}</div>
-            <p className="text-xs text-muted-foreground">
-              Manutenções agendadas
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Concluídas</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.concluidas}</div>
-            <p className="text-xs text-muted-foreground">
-              Manutenções concluídas
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-6 2xl:grid-cols-5">
+        <MetricCard
+          className="xl:col-span-2 2xl:col-span-1"
+          title="Custo Total"
+          value={`R$ ${stats.totalCusto.toFixed(2)}`}
+          caption={searchTerm ? 'Filtrado' : 'Custo acumulado'}
+          icon={<DollarSign />}
+          tone="danger"
+        />
+        <MetricCard
+          className="xl:col-span-2 2xl:col-span-1"
+          title="Custo Médio"
+          value={`R$ ${stats.custoMedio.toFixed(2)}`}
+          caption={searchTerm ? 'Filtrado' : 'Por manutenção'}
+          icon={<TrendingUp />}
+          tone="warning"
+        />
+        <MetricCard
+          className="xl:col-span-2 2xl:col-span-1"
+          title="Total Manutenções"
+          value={stats.totalManutencoes}
+          caption={searchTerm ? 'Filtrado' : 'Total registrado'}
+          icon={<Wrench />}
+          tone="primary"
+        />
+        <MetricCard
+          className="xl:col-span-3 2xl:col-span-1"
+          title="Agendadas"
+          value={stats.agendadas}
+          caption="Manutenções agendadas"
+          icon={<Calendar />}
+          tone="info"
+        />
+        <MetricCard
+          className="sm:col-span-2 xl:col-span-3 2xl:col-span-1"
+          title="Concluídas"
+          value={stats.concluidas}
+          caption="Manutenções concluídas"
+          icon={<CheckCircle />}
+          tone="success"
+        />
       </div>
 
       {/* Tabela com Pesquisa */}
@@ -284,7 +257,7 @@ export default function Maintenance() {
                     
                     return (
                       <TableRow key={manutencao.id.toString()}>
-                        <TableCell className="font-medium">
+                        <TableCell className="font-semibold tracking-wide">
                           {manutencao.veiculo_placa || "N/A"}
                         </TableCell>
                         <TableCell>
@@ -308,7 +281,7 @@ export default function Maintenance() {
                             {(manutencao as any).status || 'Agendada'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="whitespace-nowrap text-right">
                           R$ {custo.toFixed(2)}
                         </TableCell>
                         <TableCell>

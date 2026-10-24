@@ -17,16 +17,16 @@ const periods: { value: Period; label: string }[] = [
 
 export function PeriodFilter({ selected, onChange }: PeriodFilterProps) {
   return (
-    <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
-      <Calendar className="h-4 w-4 text-muted-foreground ml-2 mr-1" />
+    <div className="flex items-center gap-0.5 rounded-lg border border-border/70 bg-card p-1 shadow-card">
+      <Calendar className="ml-2 mr-1 h-4 w-4 text-muted-foreground" />
       {periods.map((p) => (
         <Button
           key={p.value}
           variant={selected === p.value ? "default" : "ghost"}
           size="sm"
-          className={`h-7 text-xs px-3 ${
+          className={`h-8 px-3 text-xs ${
             selected === p.value 
-              ? "bg-primary text-primary-foreground shadow-sm" 
+              ? "bg-primary text-primary-foreground shadow-sm hover:bg-primary-hover" 
               : "text-muted-foreground hover:text-foreground"
           }`}
           onClick={() => onChange(p.value)}
