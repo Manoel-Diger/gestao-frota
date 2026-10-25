@@ -11,6 +11,7 @@ import Drivers from "./pages/Drivers";
 import Maintenance from "./pages/Maintenance";
 import FuelPage from "./pages/Fuel";
 import Reports from "./pages/Reports";
+import Ranking from "./pages/Ranking";
 import Alerts from "./pages/Alerts";
 import Checklist from "./pages/Checklist";
 import NotFound from "./pages/NotFound";
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="maintenance" element={<Maintenance />} />
             <Route path="fuel" element={<FuelPage />} />
             <Route path="reports" element={<Reports />} />
+            <Route path="ranking" element={<Ranking />} />
             <Route path="alerts" element={<Alerts />} />
             <Route path="checklist" element={<Checklist />} />
             <Route path="settings" element={<Dashboard />} />

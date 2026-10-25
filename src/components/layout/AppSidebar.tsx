@@ -10,6 +10,7 @@ import {
   Home,
   FileText,
   ClipboardCheck,
+  Trophy,
 } from "lucide-react";
 
 import {
@@ -32,6 +33,7 @@ const navigationItems = [
   { title: "Abastecimentos", url: "/fuel", icon: Fuel },
   { title: "Checklists", url: "/checklist", icon: ClipboardCheck },
   { title: "Relatórios", url: "/reports", icon: BarChart3 },
+  { title: "Ranking", url: "/ranking", icon: Trophy },
   { title: "Alertas", url: "/alerts", icon: AlertTriangle },
 ];
 
