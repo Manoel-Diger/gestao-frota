@@ -1,3 +1,4 @@
+
 import type { Abastecimento } from '@/hooks/useAbastecimentos';
 import type { Veiculo } from '@/hooks/useVeiculos';
 
@@ -20,6 +21,7 @@ export const METAS_POR_PLACA: Record<string, number> = {
   LTY8B39: 5.5,
   IUG8855: 5.0,
   RJA2C91: 4.5,
+  RJADC91: 4.5,
   IUG8767: 5.0,
   IUG8882: 5.0,
   RKV1I73: 5.5,
